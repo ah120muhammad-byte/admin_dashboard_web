@@ -89,59 +89,36 @@ class LecturesService {
     SupabaseClient? supabase,
   }) : _supabase = supabase ?? Supabase.instance.client;
 
-  // ==========================================================================
-  // GET LECTURES
-  // ==========================================================================
-
   Future<List<AdminLecture>> getLectures() async {
     final response = await _supabase
         .from('lectures')
         .select(
           'id, module_id, title, description, '
-          'pdf_path, audio_path, video_path, '
           'display_order, is_published, is_active, '
           'created_at, updated_at, published_at',
         )
-        .order(
-          'display_order',
-          ascending: true,
-        );
+        .order('display_order', ascending: true);
 
     return (response as List)
         .map(
-          (item) => AdminLecture.fromMap(
-            Map<String, dynamic>.from(item),
-          ),
+          (item) => AdminLecture.fromMap(Map<String, dynamic>.from(item)),
         )
         .toList();
   }
-
-  // ==========================================================================
-  // GET MODULES
-  // ==========================================================================
 
   Future<List<LectureModule>> getModules() async {
     final response = await _supabase
         .from('modules')
         .select('id, name')
         .eq('is_active', true)
-        .order(
-          'display_order',
-          ascending: true,
-        );
+        .order('display_order', ascending: true);
 
     return (response as List)
         .map(
-          (item) => LectureModule.fromMap(
-            Map<String, dynamic>.from(item),
-          ),
+          (item) => LectureModule.fromMap(Map<String, dynamic>.from(item)),
         )
         .toList();
   }
-
-  // ==========================================================================
-  // CREATE LECTURE
-  // ==========================================================================
 
   Future<String> createLecture({
     required String moduleId,
@@ -165,39 +142,22 @@ class LecturesService {
     return response['id'] as String;
   }
 
-  // ==========================================================================
-  // ADD LECTURE CONTENT
-  // ==========================================================================
-
   Future<void> addLectureContent({
     required String lectureId,
     required LectureContentInput content,
   }) async {
     final bucket = _bucketForType(content.fileType);
-
-    final safeFileName = _sanitizeFileName(
-      content.fileName,
-    );
-
+    final safeFileName = _sanitizeFileName(content.fileName);
     final storagePath =
         '$lectureId/${DateTime.now().millisecondsSinceEpoch}_$safeFileName';
 
     try {
-      // Upload to PRIVATE bucket.
-      await _supabase.storage
-          .from(bucket)
-          .uploadBinary(
-            storagePath,
-            content.bytes,
-            fileOptions: const FileOptions(
-              upsert: false,
-            ),
-          );
+      await _supabase.storage.from(bucket).uploadBinary(
+        storagePath,
+        content.bytes,
+        fileOptions: const FileOptions(upsert: false),
+      );
 
-      // IMPORTANT:
-      // Do NOT use getPublicUrl().
-      //
-      // Save only the storage path.
       await _supabase.from('lecture_files').insert({
         'lecture_id': lectureId,
         'title': content.title,
@@ -207,53 +167,29 @@ class LecturesService {
         'is_active': true,
       });
     } catch (e) {
-      // If DB insert fails, remove uploaded file.
       try {
-        await _supabase.storage
-            .from(bucket)
-            .remove([storagePath]);
+        await _supabase.storage.from(bucket).remove([storagePath]);
       } catch (_) {}
-
       rethrow;
     }
   }
-
-  // ==========================================================================
-  // BUCKET
-  // ==========================================================================
 
   String _bucketForType(String type) {
     switch (type.toLowerCase()) {
       case 'pdf':
         return 'Lecture pdfs';
-
       case 'audio':
         return 'Lecture audios';
-
       case 'video':
         return 'lecture videos';
-
       default:
-        throw Exception(
-          'Unsupported lecture file type: $type',
-        );
+        throw Exception('Unsupported lecture file type: $type');
     }
   }
 
-  // ==========================================================================
-  // SANITIZE FILE NAME
-  // ==========================================================================
-
   String _sanitizeFileName(String fileName) {
-    return fileName.replaceAll(
-      RegExp(r'[^a-zA-Z0-9._-]'),
-      '_',
-    );
+    return fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
   }
-
-  // ==========================================================================
-  // UPDATE LECTURE
-  // ==========================================================================
 
   Future<void> updateLecture({
     required String id,
@@ -273,25 +209,15 @@ class LecturesService {
         .eq('id', id);
   }
 
-  // ==========================================================================
-  // ACTIVE
-  // ==========================================================================
-
   Future<void> setActive({
     required String id,
     required bool value,
   }) async {
     await _supabase
         .from('lectures')
-        .update({
-          'is_active': value,
-        })
+        .update({'is_active': value})
         .eq('id', id);
   }
-
-  // ==========================================================================
-  // PUBLISHED
-  // ==========================================================================
 
   Future<void> setPublished({
     required String id,
@@ -301,8 +227,7 @@ class LecturesService {
         .from('lectures')
         .update({
           'is_published': value,
-          'published_at':
-              value ? DateTime.now().toIso8601String() : null,
+          'published_at': value ? DateTime.now().toIso8601String() : null,
         })
         .eq('id', id);
   }
