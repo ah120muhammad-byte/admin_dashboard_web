@@ -1,32 +1,43 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../admin/layout/admin_shell.dart';
-import '../admin/screens/admin_login_screen.dart';
+import 'package:admin_dashboard_web/admin/layout/admin_shell.dart';
+import 'package:admin_dashboard_web/admin/screens/admin_login_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Supabase.initialize(
     url: 'https://eoyehpqknyoksaxlvnwl.supabase.co',
-    publishableKey:'sb_publishable_vkiv3hr00CNPiGJKlQosNw_oZEG81zZ',
+    publishableKey: 'sb_publishable_vkiv3hr00CNPiGJKlQosNw_oZEG81zZ',
   );
 
-  final session =
-      Supabase.instance.client.auth.currentSession;
+  final client = Supabase.instance.client;
+  final session = client.auth.currentSession;
+  bool isAdmin = false;
 
-  runApp(
-    AdminApp(
-      hasSession: session != null,
-    ),
-  );
+  if (session != null) {
+    try {
+      final profile = await client
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+      isAdmin = profile?['role']?.toString().toLowerCase().trim() == 'admin';
+    } catch (_) {
+      isAdmin = false;
+    }
+  }
+
+  runApp(AdminApp(isAdmin: isAdmin));
 }
 
 class AdminApp extends StatelessWidget {
-  final bool hasSession;
+  final bool isAdmin;
 
   const AdminApp({
     super.key,
-    required this.hasSession,
+    required this.isAdmin,
   });
 
   @override
@@ -35,14 +46,10 @@ class AdminApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'MediData Admin',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-        ),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
-      home: hasSession
-          ? const AdminShell()
-          : const AdminLoginScreen(),
+      home: isAdmin ? const AdminShell() : const AdminLoginScreen(),
     );
   }
 }
