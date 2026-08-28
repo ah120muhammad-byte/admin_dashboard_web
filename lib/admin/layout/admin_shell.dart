@@ -1,3 +1,4 @@
+import 'package:admin_dashboard_web/admin/screens/exams/exam_attempts_screen.dart';
 import 'package:admin_dashboard_web/admin/screens/files/lecture_content_screen.dart';
 import 'package:admin_dashboard_web/admin/screens/lectures/lectures_screen.dart';
 import 'package:admin_dashboard_web/admin/screens/notifications/notifications_screen.dart';
@@ -29,6 +30,7 @@ class _AdminShellState extends State<AdminShell> {
     NotificationsScreen(),
     SettingsScreen(),
     ExamsScreen(),
+    ExamAttemptsScreen(),
   ];
 
   final List<_SidebarItem> _items = const [
@@ -41,6 +43,7 @@ class _AdminShellState extends State<AdminShell> {
     _SidebarItem(title: 'Notifications', icon: Icons.notifications_rounded),
     _SidebarItem(title: 'Settings', icon: Icons.settings_rounded),
     _SidebarItem(title: 'Exams', icon: Icons.question_mark_outlined),
+    _SidebarItem(title: 'Exam Attempts', icon: Icons.assignment_turned_in_rounded),
   ];
 
   @override
@@ -70,10 +73,6 @@ class _AdminShellState extends State<AdminShell> {
         child: Column(
           children: [
             const SizedBox(height: 24),
-
-            // ============================================================
-            // BRAND
-            // ============================================================
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
@@ -110,12 +109,7 @@ class _AdminShellState extends State<AdminShell> {
                 ],
               ),
             ),
-
             const SizedBox(height: 32),
-
-            // ============================================================
-            // NAVIGATION
-            // ============================================================
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -128,9 +122,10 @@ class _AdminShellState extends State<AdminShell> {
                     padding: const EdgeInsets.only(bottom: 4),
                     child: ListTile(
                       selected: selected,
-                      selectedTileColor: Theme.of(
-                        context,
-                      ).colorScheme.primary.withValues(alpha: 0.10),
+                      selectedTileColor: Theme.of(context)
+                          .colorScheme
+                          .primary
+                          .withValues(alpha: 0.10),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -138,16 +133,15 @@ class _AdminShellState extends State<AdminShell> {
                         item.icon,
                         color: selected
                             ? Theme.of(context).colorScheme.primary
-                            : Theme.of(
-                                context,
-                              ).colorScheme.onSurface.withValues(alpha: 0.65),
+                            : Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.65),
                       ),
                       title: Text(
                         item.title,
                         style: TextStyle(
-                          fontWeight: selected
-                              ? FontWeight.w700
-                              : FontWeight.w500,
+                          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
                           color: selected
                               ? Theme.of(context).colorScheme.primary
                               : null,
@@ -163,19 +157,16 @@ class _AdminShellState extends State<AdminShell> {
                 },
               ),
             ),
-
-            // ============================================================
-            // FOOTER
-            // ============================================================
             Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
                 'MediData Admin',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withValues(alpha: 0.45),
-                ),
+                      color: Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withValues(alpha: 0.45),
+                    ),
               ),
             ),
           ],
@@ -191,4 +182,3 @@ class _SidebarItem {
 
   const _SidebarItem({required this.title, required this.icon});
 }
-
