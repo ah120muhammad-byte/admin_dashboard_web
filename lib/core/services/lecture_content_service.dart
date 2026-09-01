@@ -19,9 +19,7 @@ class ContentLecture {
     required this.isActive,
   });
 
-  factory ContentLecture.fromMap(
-    Map<String, dynamic> map,
-  ) {
+  factory ContentLecture.fromMap(Map<String, dynamic> map) {
     return ContentLecture(
       id: map['id'] as String,
       moduleId: map['module_id'] as String,
@@ -57,9 +55,7 @@ class LectureFileItem {
     this.updatedAt,
   });
 
-  factory LectureFileItem.fromMap(
-    Map<String, dynamic> map,
-  ) {
+  factory LectureFileItem.fromMap(Map<String, dynamic> map) {
     return LectureFileItem(
       id: map['id'] as String,
       lectureId: map['lecture_id'] as String,
@@ -69,14 +65,10 @@ class LectureFileItem {
       displayOrder: (map['display_order'] as num?)?.toInt() ?? 0,
       isActive: map['is_active'] as bool? ?? true,
       createdAt: map['created_at'] != null
-          ? DateTime.tryParse(
-              map['created_at'].toString(),
-            )
+          ? DateTime.tryParse(map['created_at'].toString())
           : null,
       updatedAt: map['updated_at'] != null
-          ? DateTime.tryParse(
-              map['updated_at'].toString(),
-            )
+          ? DateTime.tryParse(map['updated_at'].toString())
           : null,
     );
   }
@@ -85,278 +77,216 @@ class LectureFileItem {
 class LectureContentService {
   final SupabaseClient _supabase;
 
-  LectureContentService({
-    SupabaseClient? supabase,
-  }) : _supabase =
-            supabase ?? Supabase.instance.client;
-
-  // ==========================================================================
-  // BUCKET
-  // ==========================================================================
+  LectureContentService({SupabaseClient? supabase})
+      : _supabase = supabase ?? Supabase.instance.client;
 
   String bucketForType(String type) {
     switch (type.toLowerCase()) {
       case 'pdf':
         return 'Lecture pdfs';
-
       case 'audio':
         return 'Lecture audios';
-
       case 'video':
         return 'lecture videos';
-
       default:
-        throw Exception(
-          'Unsupported file type: $type',
-        );
+        throw Exception('Unsupported file type: $type');
     }
   }
-
-  // ==========================================================================
-  // GET LECTURES
-  // ==========================================================================
 
   Future<List<ContentLecture>> getLectures() async {
     final response = await _supabase
         .from('lectures')
         .select(
-          'id, module_id, title, '
-          'description, display_order, '
-          'is_published, is_active',
+          'id, module_id, title, description, display_order, is_published, is_active',
         )
-        .order(
-          'display_order',
-          ascending: true,
-        );
+        .order('display_order', ascending: true);
 
     return (response as List)
-        .map(
-          (item) => ContentLecture.fromMap(
-            Map<String, dynamic>.from(item),
-          ),
-        )
+        .map((item) => ContentLecture.fromMap(Map<String, dynamic>.from(item)))
         .toList();
   }
-
-  // ==========================================================================
-  // GET ALL FILES
-  // ==========================================================================
 
   Future<List<LectureFileItem>> getLectureFiles() async {
     final response = await _supabase
         .from('lecture_files')
         .select(
-          'id, lecture_id, title, file_type, '
-          'file_url, display_order, is_active, '
-          'created_at, updated_at',
+          'id, lecture_id, title, file_type, file_url, display_order, is_active, created_at, updated_at',
         )
-        .order(
-          'display_order',
-          ascending: true,
-        );
+        .order('display_order', ascending: true);
 
     return (response as List)
-        .map(
-          (item) => LectureFileItem.fromMap(
-            Map<String, dynamic>.from(item),
-          ),
-        )
+        .map((item) => LectureFileItem.fromMap(Map<String, dynamic>.from(item)))
         .toList();
   }
 
-  // ==========================================================================
-  // GET FILES FOR ONE LECTURE
-  // ==========================================================================
-
-  Future<List<LectureFileItem>> getFilesForLecture(
-    String lectureId,
-  ) async {
+  Future<List<LectureFileItem>> getFilesForLecture(String lectureId) async {
     final response = await _supabase
         .from('lecture_files')
         .select(
-          'id, lecture_id, title, file_type, '
-          'file_url, display_order, is_active, '
-          'created_at, updated_at',
+          'id, lecture_id, title, file_type, file_url, display_order, is_active, created_at, updated_at',
         )
-        .eq(
-          'lecture_id',
-          lectureId,
-        )
-        .eq(
-          'is_active',
-          true,
-        )
-        .order(
-          'display_order',
-          ascending: true,
-        );
+        .eq('lecture_id', lectureId)
+        .order('display_order', ascending: true);
 
     return (response as List)
-        .map(
-          (item) => LectureFileItem.fromMap(
-            Map<String, dynamic>.from(item),
-          ),
-        )
+        .map((item) => LectureFileItem.fromMap(Map<String, dynamic>.from(item)))
         .toList();
   }
 
-  // ==========================================================================
-  // CREATE SIGNED URL
-  // ==========================================================================
-
-  Future<String> createFileUrl(
-    LectureFileItem file,
-  ) async {
-    final bucket = bucketForType(
-      file.fileType,
-    );
-
-    final path = _extractStoragePath(
-      file.fileUrl,
-      bucket,
-    );
+  Future<String> createFileUrl(LectureFileItem file) async {
+    final bucket = bucketForType(file.fileType);
+    final path = _extractStoragePath(file.fileUrl, bucket);
 
     if (path.isEmpty) {
-      throw Exception(
-        'Invalid storage path for file: ${file.title}',
-      );
+      throw Exception('Invalid storage path for file: ${file.title}');
     }
 
-    return _supabase.storage
-        .from(bucket)
-        .createSignedUrl(
-          path,
-          3600,
-        );
+    return _supabase.storage.from(bucket).createSignedUrl(path, 3600);
   }
 
-  // ==========================================================================
-  // EXTRACT STORAGE PATH
-  // ==========================================================================
-
-  String _extractStoragePath(
-    String value,
-    String bucket,
-  ) {
+  String _extractStoragePath(String value, String bucket) {
     final trimmed = value.trim();
+    if (trimmed.isEmpty) return '';
 
-    if (trimmed.isEmpty) {
-      return '';
-    }
-
-    // New format:
-    //
-    // lectureId/file.pdf
-    //
-    if (!trimmed.startsWith('http://') &&
-        !trimmed.startsWith('https://')) {
+    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
       return trimmed;
     }
-
-    // Old URL format:
-    //
-    // https://xxx.supabase.co/storage/v1/object/public/Bucket/file.pdf
 
     final uri = Uri.tryParse(trimmed);
-
-    if (uri == null) {
-      return trimmed;
-    }
+    if (uri == null) return trimmed;
 
     final segments = uri.pathSegments;
-
     final bucketIndex = segments.indexWhere(
-      (segment) =>
-          Uri.decodeComponent(segment) == bucket,
+      (segment) => Uri.decodeComponent(segment) == bucket,
     );
 
-    if (bucketIndex == -1) {
-      throw Exception(
-        'Bucket "$bucket" was not found in file URL.',
-      );
-    }
+    if (bucketIndex == -1 || bucketIndex + 1 >= segments.length) return '';
 
-    if (bucketIndex + 1 >= segments.length) {
-      return '';
-    }
-
-    final pathSegments = segments.sublist(
-      bucketIndex + 1,
-    );
-
-    return pathSegments
+    return segments
+        .sublist(bucketIndex + 1)
         .map(Uri.decodeComponent)
         .join('/');
   }
 
-  // ==========================================================================
-  // DELETE FILE
-  // ==========================================================================
-
-  Future<void> deleteLectureFile({
-    required LectureFileItem file,
+  Future<void> addLectureFile({
+    required String lectureId,
+    required String title,
+    required String fileType,
+    required List<int> bytes,
+    required String fileName,
+    int? displayOrder,
   }) async {
-    final bucket = bucketForType(
-      file.fileType,
-    );
-
-    final path = _extractStoragePath(
-      file.fileUrl,
-      bucket,
-    );
+    final bucket = bucketForType(fileType);
+    final safeFileName = _sanitizeFileName(fileName);
+    final storagePath =
+        '$lectureId/${DateTime.now().microsecondsSinceEpoch}_$safeFileName';
 
     try {
-      if (path.isNotEmpty) {
-        await _supabase.storage
-            .from(bucket)
-            .remove([path]);
-      }
-    } finally {
-      await _supabase
-          .from('lecture_files')
-          .delete()
-          .eq(
-            'id',
-            file.id,
-          );
+      await _supabase.storage.from(bucket).uploadBinary(
+        storagePath,
+        bytes,
+        fileOptions: const FileOptions(upsert: false),
+      );
+
+      final order = displayOrder ?? await _nextDisplayOrder(lectureId);
+
+      await _supabase.from('lecture_files').insert({
+        'lecture_id': lectureId,
+        'title': title,
+        'file_type': fileType,
+        'file_url': storagePath,
+        'display_order': order,
+        'is_active': true,
+      });
+    } catch (e) {
+      try {
+        await _supabase.storage.from(bucket).remove([storagePath]);
+      } catch (_) {}
+      rethrow;
     }
   }
 
-  // ==========================================================================
-  // ACTIVE / INACTIVE
-  // ==========================================================================
-
-  Future<void> setFileActive({
-    required String id,
-    required bool value,
-  }) async {
-    await _supabase
+  Future<int> _nextDisplayOrder(String lectureId) async {
+    final response = await _supabase
         .from('lecture_files')
-        .update({
-          'is_active': value,
-        })
-        .eq(
-          'id',
-          id,
-        );
+        .select('display_order')
+        .eq('lecture_id', lectureId)
+        .order('display_order', ascending: false)
+        .limit(1);
+
+    if (response is List && response.isNotEmpty) {
+      return ((response.first['display_order'] as num?)?.toInt() ?? 0) + 1;
+    }
+    return 1;
   }
 
-  // ==========================================================================
-  // UPDATE TITLE
-  // ==========================================================================
-
-  Future<void> updateFileTitle({
-    required String id,
-    required String title,
+  Future<void> replaceLectureFile({
+    required LectureFileItem file,
+    required List<int> bytes,
+    required String newFileName,
   }) async {
+    final bucket = bucketForType(file.fileType);
+    final oldPath = _extractStoragePath(file.fileUrl, bucket);
+    final safeFileName = _sanitizeFileName(newFileName);
+    final newPath =
+        '${file.lectureId}/${DateTime.now().microsecondsSinceEpoch}_$safeFileName';
+
+    try {
+      await _supabase.storage.from(bucket).uploadBinary(
+        newPath,
+        bytes,
+        fileOptions: const FileOptions(upsert: false),
+      );
+    } catch (e) {
+      rethrow;
+    }
+
+    try {
+      await _supabase
+          .from('lecture_files')
+          .update({'file_url': newPath})
+          .eq('id', file.id);
+    } catch (e) {
+      try {
+        await _supabase.storage.from(bucket).remove([newPath]);
+      } catch (_) {}
+      rethrow;
+    }
+
+    if (oldPath.isNotEmpty && oldPath != newPath) {
+      try {
+        await _supabase.storage.from(bucket).remove([oldPath]);
+      } catch (_) {
+        // The DB now points to the new file, so an orphan cleanup failure
+        // must not make a successful replacement look like a failure.
+      }
+    }
+  }
+
+  Future<void> updateFileTitle({required String id, required String title}) async {
+    await _supabase.from('lecture_files').update({'title': title}).eq('id', id);
+  }
+
+  Future<void> setFileActive({required String id, required bool value}) async {
     await _supabase
         .from('lecture_files')
-        .update({
-          'title': title,
-        })
-        .eq(
-          'id',
-          id,
-        );
+        .update({'is_active': value})
+        .eq('id', id);
+  }
+
+  Future<void> deleteLectureFile({required LectureFileItem file}) async {
+    final bucket = bucketForType(file.fileType);
+    final path = _extractStoragePath(file.fileUrl, bucket);
+
+    if (path.isNotEmpty) {
+      await _supabase.storage.from(bucket).remove([path]);
+    }
+
+    await _supabase.from('lecture_files').delete().eq('id', file.id);
+  }
+
+  String _sanitizeFileName(String fileName) {
+    final cleaned = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+    return cleaned.isEmpty ? 'file' : cleaned;
   }
 }
