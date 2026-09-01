@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ContentLecture {
@@ -180,11 +182,12 @@ class LectureContentService {
     final safeFileName = _sanitizeFileName(fileName);
     final storagePath =
         '$lectureId/${DateTime.now().microsecondsSinceEpoch}_$safeFileName';
+    final uploadBytes = bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
 
     try {
       await _supabase.storage.from(bucket).uploadBinary(
         storagePath,
-        bytes,
+        uploadBytes,
         fileOptions: const FileOptions(upsert: false),
       );
 
@@ -214,8 +217,9 @@ class LectureContentService {
         .order('display_order', ascending: false)
         .limit(1);
 
-    if (response is List && response.isNotEmpty) {
-      return ((response.first['display_order'] as num?)?.toInt() ?? 0) + 1;
+    final rows = response as List;
+    if (rows.isNotEmpty) {
+      return ((rows.first['display_order'] as num?)?.toInt() ?? 0) + 1;
     }
     return 1;
   }
@@ -230,16 +234,13 @@ class LectureContentService {
     final safeFileName = _sanitizeFileName(newFileName);
     final newPath =
         '${file.lectureId}/${DateTime.now().microsecondsSinceEpoch}_$safeFileName';
+    final uploadBytes = bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
 
-    try {
-      await _supabase.storage.from(bucket).uploadBinary(
-        newPath,
-        bytes,
-        fileOptions: const FileOptions(upsert: false),
-      );
-    } catch (e) {
-      rethrow;
-    }
+    await _supabase.storage.from(bucket).uploadBinary(
+      newPath,
+      uploadBytes,
+      fileOptions: const FileOptions(upsert: false),
+    );
 
     try {
       await _supabase
@@ -257,17 +258,22 @@ class LectureContentService {
       try {
         await _supabase.storage.from(bucket).remove([oldPath]);
       } catch (_) {
-        // The DB now points to the new file, so an orphan cleanup failure
-        // must not make a successful replacement look like a failure.
+        // The database already points to the new file.
       }
     }
   }
 
-  Future<void> updateFileTitle({required String id, required String title}) async {
+  Future<void> updateFileTitle({
+    required String id,
+    required String title,
+  }) async {
     await _supabase.from('lecture_files').update({'title': title}).eq('id', id);
   }
 
-  Future<void> setFileActive({required String id, required bool value}) async {
+  Future<void> setFileActive({
+    required String id,
+    required bool value,
+  }) async {
     await _supabase
         .from('lecture_files')
         .update({'is_active': value})
