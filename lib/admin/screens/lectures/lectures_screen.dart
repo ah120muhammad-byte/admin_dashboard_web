@@ -215,7 +215,7 @@ class _LecturesScreenState extends State<LecturesScreen> {
                     : ListView.separated(
                         padding: const EdgeInsets.fromLTRB(20, 12, 20, 90),
                         itemCount: lectures.length,
-                        separatorBuilder: (_, __) =>
+                        separatorBuilder: (_, _) =>
                             const SizedBox(height: 10),
                         itemBuilder: (context, index) {
                           final lecture = lectures[index];
@@ -324,7 +324,7 @@ class _LectureDialogState extends State<_LectureDialog> {
   late String _moduleId;
 
   final List<LectureContentInput> _contents = <LectureContentInput>[];
-  bool _busy = false;
+  final bool _busy = false;
 
   @override
   void initState() {

@@ -205,7 +205,7 @@ class LecturesService {
         .order('display_order', ascending: false)
         .limit(1);
 
-    if (response is List && response.isNotEmpty) {
+    if (response.isNotEmpty) {
       return ((response.first['display_order'] as num?)?.toInt() ?? 0) + 1;
     }
 
