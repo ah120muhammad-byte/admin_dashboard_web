@@ -36,7 +36,10 @@ class _LecturesScreenState extends State<LecturesScreen> {
 
   Future<void> _refresh() async {
     final future = _loadData();
-    setState(() => _lecturesFuture = future);
+    if (!mounted) return;
+    setState(() {
+      _lecturesFuture = future;
+    });
     await future;
   }
 
@@ -222,57 +225,61 @@ class _LecturesScreenState extends State<LecturesScreen> {
                           final module = _moduleFor(lecture.moduleId);
                           return Card(
                             clipBehavior: Clip.antiAlias,
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                child: Text('${lecture.displayOrder}'),
-                              ),
-                              title: Text(
-                                lecture.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              subtitle: Text(
-                                '${module?.name ?? 'Unknown Module'} • '
-                                '${lecture.isPublished ? 'Published' : 'Draft'}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              trailing: PopupMenuButton<String>(
-                                onSelected: (value) {
-                                  switch (value) {
-                                    case 'edit':
-                                      _showLectureDialog(lecture: lecture);
-                                      break;
-                                    case 'active':
-                                      _toggleActive(lecture);
-                                      break;
-                                    case 'publish':
-                                      _togglePublished(lecture);
-                                      break;
-                                  }
-                                },
-                                itemBuilder: (_) => [
-                                  const PopupMenuItem(
-                                    value: 'edit',
-                                    child: Text('Edit'),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'publish',
-                                    child: Text(
-                                      lecture.isPublished
-                                          ? 'Unpublish'
-                                          : 'Publish',
+                            child: Material(
+                              color: scheme.surface,
+                              borderRadius: BorderRadius.circular(12),
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  child: Text('${lecture.displayOrder}'),
+                                ),
+                                title: Text(
+                                  lecture.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                subtitle: Text(
+                                  '${module?.name ?? 'Unknown Module'} • '
+                                  '${lecture.isPublished ? 'Published' : 'Draft'}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                trailing: PopupMenuButton<String>(
+                                  onSelected: (value) {
+                                    switch (value) {
+                                      case 'edit':
+                                        _showLectureDialog(lecture: lecture);
+                                        break;
+                                      case 'active':
+                                        _toggleActive(lecture);
+                                        break;
+                                      case 'publish':
+                                        _togglePublished(lecture);
+                                        break;
+                                    }
+                                  },
+                                  itemBuilder: (_) => [
+                                    const PopupMenuItem(
+                                      value: 'edit',
+                                      child: Text('Edit'),
                                     ),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'active',
-                                    child: Text(
-                                      lecture.isActive
-                                          ? 'Deactivate'
-                                          : 'Activate',
+                                    PopupMenuItem(
+                                      value: 'publish',
+                                      child: Text(
+                                        lecture.isPublished
+                                            ? 'Unpublish'
+                                            : 'Publish',
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                    PopupMenuItem(
+                                      value: 'active',
+                                      child: Text(
+                                        lecture.isActive
+                                            ? 'Deactivate'
+                                            : 'Activate',
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
                           );
@@ -356,6 +363,7 @@ class _LectureDialogState extends State<_LectureDialog> {
       _ => <String>[],
     };
 
+    setState(() => _busy = true);
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -394,6 +402,8 @@ class _LectureDialogState extends State<_LectureDialog> {
       setState(() => _contents.add(input));
     } catch (e) {
       if (mounted) _showMessage('Unable to add content: $e', error: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -409,8 +419,9 @@ class _LectureDialogState extends State<_LectureDialog> {
       ..showSnackBar(
         SnackBar(
           content: Text(message),
-          backgroundColor:
-              error ? Theme.of(context).colorScheme.error : null,
+          backgroundColor: error
+              ? Theme.of(context).colorScheme.error
+              : null,
         ),
       );
   }
@@ -455,7 +466,7 @@ class _LectureDialogState extends State<_LectureDialog> {
   Widget build(BuildContext context) {
     final editing = widget.lecture != null;
     final size = MediaQuery.sizeOf(context);
-    final maxHeight = size.height * 0.82;
+    final maxHeight = size.height * 0.78;
 
     return AlertDialog(
       title: Text(editing ? 'Edit Lecture' : 'Add Lecture'),
@@ -574,25 +585,28 @@ class _LectureDialogState extends State<_LectureDialog> {
                       (content) => Card(
                         margin: const EdgeInsets.only(bottom: 8),
                         clipBehavior: Clip.antiAlias,
-                        child: ListTile(
-                          leading: Icon(_contentIcon(content.fileType)),
-                          title: Text(
-                            content.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          subtitle: Text(
-                            '${content.fileType.toUpperCase()} • '
-                            '${content.fileName} • order ${content.displayOrder}',
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          trailing: IconButton(
-                            tooltip: 'Remove',
-                            onPressed: _busy
-                                ? null
-                                : () => _removeContent(content),
-                            icon: const Icon(Icons.delete_outline_rounded),
+                        child: Material(
+                          color: Theme.of(context).colorScheme.surface,
+                          child: ListTile(
+                            leading: Icon(_contentIcon(content.fileType)),
+                            title: Text(
+                              content.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              '${content.fileType.toUpperCase()} • '
+                              '${content.fileName} • order ${content.displayOrder}',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: IconButton(
+                              tooltip: 'Remove',
+                              onPressed: _busy
+                                  ? null
+                                  : () => _removeContent(content),
+                              icon: const Icon(Icons.delete_outline_rounded),
+                            ),
                           ),
                         ),
                       ),
@@ -645,8 +659,7 @@ class _ContentEditorDialogState extends State<_ContentEditorDialog> {
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.initialTitle);
-    _orderController =
-        TextEditingController(text: '${widget.initialOrder}');
+    _orderController = TextEditingController(text: '${widget.initialOrder}');
   }
 
   @override
@@ -694,7 +707,7 @@ class _ContentEditorDialogState extends State<_ContentEditorDialog> {
         children: [
           Icon(_icon()),
           const SizedBox(width: 10),
-          Expanded(child: Text('Add ${widget.fileType.toUpperCase()}')),
+          Text('Add ${widget.fileType.toUpperCase()}'),
         ],
       ),
       content: SizedBox(
@@ -856,25 +869,28 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline_rounded, size: 48),
-            const SizedBox(height: 12),
-            Text(
+            Icon(Icons.cloud_off_rounded, size: 56, color: scheme.error),
+            const SizedBox(height: 16),
+            const Text(
               'Unable to load lectures.',
-              style: Theme.of(context).textTheme.titleMedium,
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 6),
-            Text(error, textAlign: TextAlign.center),
+            const SizedBox(height: 8),
+            SelectableText(error, textAlign: TextAlign.center),
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Retry'),
+              label: const Text('Try Again'),
             ),
           ],
         ),
