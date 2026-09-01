@@ -93,15 +93,16 @@ class LecturesService {
     final response = await _supabase
         .from('lectures')
         .select(
-          'id, module_id, title, description, '
-          'display_order, is_published, is_active, '
-          'created_at, updated_at, published_at',
+          'id, module_id, title, description, display_order, '
+          'is_published, is_active, created_at, updated_at, published_at',
         )
         .order('display_order', ascending: true);
 
     return (response as List)
         .map(
-          (item) => AdminLecture.fromMap(Map<String, dynamic>.from(item)),
+          (item) => AdminLecture.fromMap(
+            Map<String, dynamic>.from(item),
+          ),
         )
         .toList();
   }
@@ -115,7 +116,9 @@ class LecturesService {
 
     return (response as List)
         .map(
-          (item) => LectureModule.fromMap(Map<String, dynamic>.from(item)),
+          (item) => LectureModule.fromMap(
+            Map<String, dynamic>.from(item),
+          ),
         )
         .toList();
   }
@@ -146,24 +149,44 @@ class LecturesService {
     required String lectureId,
     required LectureContentInput content,
   }) async {
-    final bucket = _bucketForType(content.fileType);
-    final safeFileName = _sanitizeFileName(content.fileName);
+    await addLectureFile(
+      lectureId: lectureId,
+      title: content.title,
+      fileType: content.fileType,
+      bytes: content.bytes,
+      fileName: content.fileName,
+      displayOrder: content.displayOrder,
+    );
+  }
+
+  Future<void> addLectureFile({
+    required String lectureId,
+    required String title,
+    required String fileType,
+    required Uint8List bytes,
+    required String fileName,
+    int? displayOrder,
+  }) async {
+    final bucket = _bucketForType(fileType);
+    final safeFileName = _sanitizeFileName(fileName);
     final storagePath =
-        '$lectureId/${DateTime.now().millisecondsSinceEpoch}_$safeFileName';
+        '$lectureId/${DateTime.now().microsecondsSinceEpoch}_$safeFileName';
 
     try {
       await _supabase.storage.from(bucket).uploadBinary(
         storagePath,
-        content.bytes,
+        bytes,
         fileOptions: const FileOptions(upsert: false),
       );
 
+      final order = displayOrder ?? await _nextDisplayOrder(lectureId);
+
       await _supabase.from('lecture_files').insert({
         'lecture_id': lectureId,
-        'title': content.title,
-        'file_type': content.fileType,
+        'title': title,
+        'file_type': fileType,
         'file_url': storagePath,
-        'display_order': content.displayOrder,
+        'display_order': order,
         'is_active': true,
       });
     } catch (e) {
@@ -174,21 +197,61 @@ class LecturesService {
     }
   }
 
-  String _bucketForType(String type) {
-    switch (type.toLowerCase()) {
-      case 'pdf':
-        return 'Lecture pdfs';
-      case 'audio':
-        return 'Lecture audios';
-      case 'video':
-        return 'lecture videos';
-      default:
-        throw Exception('Unsupported lecture file type: $type');
+  Future<int> _nextDisplayOrder(String lectureId) async {
+    final response = await _supabase
+        .from('lecture_files')
+        .select('display_order')
+        .eq('lecture_id', lectureId)
+        .order('display_order', ascending: false)
+        .limit(1);
+
+    if (response is List && response.isNotEmpty) {
+      return ((response.first['display_order'] as num?)?.toInt() ?? 0) + 1;
     }
+
+    return 1;
   }
 
-  String _sanitizeFileName(String fileName) {
-    return fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+  Future<void> replaceLectureFile({
+    required String lectureFileId,
+    required String lectureId,
+    required String fileType,
+    required List<int> bytes,
+    required String newFileName,
+    required String oldFileUrl,
+  }) async {
+    final bucket = _bucketForType(fileType);
+    final oldPath = _extractStoragePath(oldFileUrl, bucket);
+    final safeFileName = _sanitizeFileName(newFileName);
+    final newPath =
+        '$lectureId/${DateTime.now().microsecondsSinceEpoch}_$safeFileName';
+    final newBytes = Uint8List.fromList(bytes);
+
+    await _supabase.storage.from(bucket).uploadBinary(
+      newPath,
+      newBytes,
+      fileOptions: const FileOptions(upsert: false),
+    );
+
+    try {
+      await _supabase
+          .from('lecture_files')
+          .update({'file_url': newPath})
+          .eq('id', lectureFileId);
+    } catch (e) {
+      try {
+        await _supabase.storage.from(bucket).remove([newPath]);
+      } catch (_) {}
+      rethrow;
+    }
+
+    if (oldPath.isNotEmpty && oldPath != newPath) {
+      try {
+        await _supabase.storage.from(bucket).remove([oldPath]);
+      } catch (_) {
+        // The DB already points to the new file. Keep the successful replace.
+      }
+    }
   }
 
   Future<void> updateLecture({
@@ -230,5 +293,52 @@ class LecturesService {
           'published_at': value ? DateTime.now().toIso8601String() : null,
         })
         .eq('id', id);
+  }
+
+  String _bucketForType(String type) {
+    switch (type.toLowerCase()) {
+      case 'pdf':
+        return 'Lecture pdfs';
+      case 'audio':
+        return 'Lecture audios';
+      case 'video':
+        return 'lecture videos';
+      default:
+        throw Exception('Unsupported lecture file type: $type');
+    }
+  }
+
+  String _extractStoragePath(String value, String bucket) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return '';
+
+    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null) return trimmed;
+
+    final segments = uri.pathSegments;
+    final bucketIndex = segments.indexWhere(
+      (segment) => Uri.decodeComponent(segment) == bucket,
+    );
+
+    if (bucketIndex == -1 || bucketIndex + 1 >= segments.length) {
+      return '';
+    }
+
+    return segments
+        .sublist(bucketIndex + 1)
+        .map(Uri.decodeComponent)
+        .join('/');
+  }
+
+  String _sanitizeFileName(String fileName) {
+    final cleaned = fileName.replaceAll(
+      RegExp(r'[^a-zA-Z0-9._-]'),
+      '_',
+    );
+    return cleaned.isEmpty ? 'file' : cleaned;
   }
 }
