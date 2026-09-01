@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
@@ -119,7 +121,9 @@ class _LecturesScreenState extends State<LecturesScreen> {
     try {
       await _service.setActive(id: lecture.id, value: !lecture.isActive);
       if (!mounted) return;
-      _showMessage(lecture.isActive ? 'Lecture deactivated.' : 'Lecture activated.');
+      _showMessage(
+        lecture.isActive ? 'Lecture deactivated.' : 'Lecture activated.',
+      );
       await _refresh();
     } catch (e) {
       if (mounted) _showMessage('Error: $e', error: true);
@@ -128,9 +132,14 @@ class _LecturesScreenState extends State<LecturesScreen> {
 
   Future<void> _togglePublished(AdminLecture lecture) async {
     try {
-      await _service.setPublished(id: lecture.id, value: !lecture.isPublished);
+      await _service.setPublished(
+        id: lecture.id,
+        value: !lecture.isPublished,
+      );
       if (!mounted) return;
-      _showMessage(lecture.isPublished ? 'Lecture unpublished.' : 'Lecture published.');
+      _showMessage(
+        lecture.isPublished ? 'Lecture unpublished.' : 'Lecture published.',
+      );
       await _refresh();
     } catch (e) {
       if (mounted) _showMessage('Error: $e', error: true);
@@ -144,7 +153,9 @@ class _LecturesScreenState extends State<LecturesScreen> {
       ..showSnackBar(
         SnackBar(
           content: Text(message),
-          backgroundColor: error ? Theme.of(context).colorScheme.error : null,
+          backgroundColor: error
+              ? Theme.of(context).colorScheme.error
+              : null,
         ),
       );
   }
@@ -204,66 +215,64 @@ class _LecturesScreenState extends State<LecturesScreen> {
                     : ListView.separated(
                         padding: const EdgeInsets.fromLTRB(20, 12, 20, 90),
                         itemCount: lectures.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(height: 10),
                         itemBuilder: (context, index) {
                           final lecture = lectures[index];
                           final module = _moduleFor(lecture.moduleId);
                           return Card(
                             clipBehavior: Clip.antiAlias,
-                            child: Material(
-                              color: scheme.surface,
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  child: Text('${lecture.displayOrder}'),
-                                ),
-                                title: Text(
-                                  lecture.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                subtitle: Text(
-                                  '${module?.name ?? 'Unknown Module'} • '
-                                  '${lecture.isPublished ? 'Published' : 'Draft'}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                trailing: PopupMenuButton<String>(
-                                  onSelected: (value) {
-                                    switch (value) {
-                                      case 'edit':
-                                        _showLectureDialog(lecture: lecture);
-                                        break;
-                                      case 'active':
-                                        _toggleActive(lecture);
-                                        break;
-                                      case 'publish':
-                                        _togglePublished(lecture);
-                                        break;
-                                    }
-                                  },
-                                  itemBuilder: (_) => [
-                                    const PopupMenuItem(
-                                      value: 'edit',
-                                      child: Text('Edit'),
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                child: Text('${lecture.displayOrder}'),
+                              ),
+                              title: Text(
+                                lecture.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: Text(
+                                '${module?.name ?? 'Unknown Module'} • '
+                                '${lecture.isPublished ? 'Published' : 'Draft'}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              trailing: PopupMenuButton<String>(
+                                onSelected: (value) {
+                                  switch (value) {
+                                    case 'edit':
+                                      _showLectureDialog(lecture: lecture);
+                                      break;
+                                    case 'active':
+                                      _toggleActive(lecture);
+                                      break;
+                                    case 'publish':
+                                      _togglePublished(lecture);
+                                      break;
+                                  }
+                                },
+                                itemBuilder: (_) => [
+                                  const PopupMenuItem(
+                                    value: 'edit',
+                                    child: Text('Edit'),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'publish',
+                                    child: Text(
+                                      lecture.isPublished
+                                          ? 'Unpublish'
+                                          : 'Publish',
                                     ),
-                                    PopupMenuItem(
-                                      value: 'publish',
-                                      child: Text(
-                                        lecture.isPublished
-                                            ? 'Unpublish'
-                                            : 'Publish',
-                                      ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'active',
+                                    child: Text(
+                                      lecture.isActive
+                                          ? 'Deactivate'
+                                          : 'Activate',
                                     ),
-                                    PopupMenuItem(
-                                      value: 'active',
-                                      child: Text(
-                                        lecture.isActive
-                                            ? 'Deactivate'
-                                            : 'Activate',
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             ),
                           );
@@ -382,7 +391,6 @@ class _LectureDialogState extends State<_LectureDialog> {
       );
 
       if (!mounted || input == null) return;
-
       setState(() => _contents.add(input));
     } catch (e) {
       if (mounted) _showMessage('Unable to add content: $e', error: true);
@@ -566,28 +574,25 @@ class _LectureDialogState extends State<_LectureDialog> {
                       (content) => Card(
                         margin: const EdgeInsets.only(bottom: 8),
                         clipBehavior: Clip.antiAlias,
-                        child: Material(
-                          color: Theme.of(context).colorScheme.surface,
-                          child: ListTile(
-                            leading: Icon(_contentIcon(content.fileType)),
-                            title: Text(
-                              content.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            subtitle: Text(
-                              '${content.fileType.toUpperCase()} • '
-                              '${content.fileName} • order ${content.displayOrder}',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            trailing: IconButton(
-                              tooltip: 'Remove',
-                              onPressed: _busy
-                                  ? null
-                                  : () => _removeContent(content),
-                              icon: const Icon(Icons.delete_outline_rounded),
-                            ),
+                        child: ListTile(
+                          leading: Icon(_contentIcon(content.fileType)),
+                          title: Text(
+                            content.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(
+                            '${content.fileType.toUpperCase()} • '
+                            '${content.fileName} • order ${content.displayOrder}',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          trailing: IconButton(
+                            tooltip: 'Remove',
+                            onPressed: _busy
+                                ? null
+                                : () => _removeContent(content),
+                            icon: const Icon(Icons.delete_outline_rounded),
                           ),
                         ),
                       ),
@@ -689,7 +694,7 @@ class _ContentEditorDialogState extends State<_ContentEditorDialog> {
         children: [
           Icon(_icon()),
           const SizedBox(width: 10),
-          Text('Add ${widget.fileType.toUpperCase()}'),
+          Expanded(child: Text('Add ${widget.fileType.toUpperCase()}')),
         ],
       ),
       content: SizedBox(
@@ -864,10 +869,7 @@ class _ErrorView extends StatelessWidget {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 6),
-            Text(
-              error,
-              textAlign: TextAlign.center,
-            ),
+            Text(error, textAlign: TextAlign.center),
             const SizedBox(height: 16),
             FilledButton.icon(
               onPressed: onRetry,
