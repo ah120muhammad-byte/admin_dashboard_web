@@ -331,7 +331,7 @@ class _LectureDialogState extends State<_LectureDialog> {
   late String _moduleId;
 
   final List<LectureContentInput> _contents = <LectureContentInput>[];
-  final bool _busy = false;
+  bool _busy = false;
 
   @override
   void initState() {
