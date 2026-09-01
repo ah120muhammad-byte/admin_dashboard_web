@@ -586,39 +586,42 @@ class _LectureSectionState extends State<_LectureSection> {
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
-          ListTile(
-            onTap: () => setState(() => expanded = !expanded),
-            leading: CircleAvatar(child: Text('${widget.lecture.displayOrder}')),
-            title: Text(
-              widget.lecture.title,
-              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
-            ),
-            subtitle: Text(
-              '${widget.files.length} ${widget.files.length == 1 ? 'file' : 'files'}',
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  widget.lecture.isPublished
-                      ? Icons.visibility_rounded
-                      : Icons.visibility_off_rounded,
-                  color: widget.lecture.isPublished
-                      ? scheme.primary
-                      : scheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 8),
-                Icon(
-                  widget.lecture.isActive
-                      ? Icons.check_circle_rounded
-                      : Icons.cancel_rounded,
-                  color: widget.lecture.isActive
-                      ? scheme.primary
-                      : scheme.error,
-                ),
-                const SizedBox(width: 8),
-                Icon(expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded),
-              ],
+          Material(
+            color: scheme.surface,
+            child: ListTile(
+              onTap: () => setState(() => expanded = !expanded),
+              leading: CircleAvatar(child: Text('${widget.lecture.displayOrder}')),
+              title: Text(
+                widget.lecture.title,
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+              ),
+              subtitle: Text(
+                '${widget.files.length} ${widget.files.length == 1 ? 'file' : 'files'}',
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    widget.lecture.isPublished
+                        ? Icons.visibility_rounded
+                        : Icons.visibility_off_rounded,
+                    color: widget.lecture.isPublished
+                        ? scheme.primary
+                        : scheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    widget.lecture.isActive
+                        ? Icons.check_circle_rounded
+                        : Icons.cancel_rounded,
+                    color: widget.lecture.isActive
+                        ? scheme.primary
+                        : scheme.error,
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded),
+                ],
+              ),
             ),
           ),
           if (expanded)
@@ -731,14 +734,20 @@ class _FileTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final tileColor = file.isActive
+        ? scheme.surface
+        : scheme.surfaceContainerHighest;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Material(
-        color: Colors.transparent,
+        color: tileColor,
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
         child: ListTile(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          tileColor: file.isActive ? scheme.surface : scheme.surfaceContainerHighest,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
           leading: Container(
             width: 44,
             height: 44,
@@ -767,7 +776,11 @@ class _FileTile extends StatelessWidget {
                 ),
                 child: Text(
                   file.fileType.toUpperCase(),
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: iconColor),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: iconColor,
+                  ),
                 ),
               ),
             ],
@@ -776,7 +789,10 @@ class _FileTile extends StatelessWidget {
             'Order ${file.displayOrder} • ${file.fileUrl}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
+            style: TextStyle(
+              color: scheme.onSurfaceVariant,
+              fontSize: 12,
+            ),
           ),
           trailing: Wrap(
             spacing: 2,
@@ -795,7 +811,9 @@ class _FileTile extends StatelessWidget {
                 tooltip: file.isActive ? 'Deactivate' : 'Activate',
                 onPressed: onToggleActive,
                 icon: Icon(
-                  file.isActive ? Icons.toggle_on_rounded : Icons.toggle_off_rounded,
+                  file.isActive
+                      ? Icons.toggle_on_rounded
+                      : Icons.toggle_off_rounded,
                 ),
               ),
               IconButton(
@@ -806,7 +824,10 @@ class _FileTile extends StatelessWidget {
               IconButton(
                 tooltip: 'Delete',
                 onPressed: onDelete,
-                icon: Icon(Icons.delete_outline_rounded, color: scheme.error),
+                icon: Icon(
+                  Icons.delete_outline_rounded,
+                  color: scheme.error,
+                ),
               ),
             ],
           ),
