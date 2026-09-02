@@ -35,7 +35,9 @@ class _ModulesScreenState extends State<ModulesScreen> {
   void _onSearchChanged() {
     final value = _searchController.text.trim().toLowerCase();
     if (value == _search) return;
-    setState(() => _search = value);
+    setState(() {
+      _search = value;
+    });
   }
 
   Future<_ModulesPageData> _loadData() async {
@@ -106,7 +108,7 @@ class _ModulesScreenState extends State<ModulesScreen> {
       await showDialog<void>(
         context: context,
         builder: (dialogContext) => StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
+          builder: (dialogContext, setDialogState) => AlertDialog(
             title: Text(module == null ? 'Add Module' : 'Edit Module'),
             content: SizedBox(
               width: 560,
@@ -131,7 +133,9 @@ class _ModulesScreenState extends State<ModulesScreen> {
                             )
                             .toList(),
                         onChanged: (value) {
-                          setDialogState(() => selectedLevelId = value);
+                          setDialogState(() {
+                            selectedLevelId = value;
+                          });
                         },
                         validator: (value) => value == null || value.isEmpty
                             ? 'Academic Level is required'
@@ -144,9 +148,10 @@ class _ModulesScreenState extends State<ModulesScreen> {
                           labelText: 'Module Name',
                           prefixIcon: Icon(Icons.menu_book_outlined),
                         ),
-                        validator: (value) => value == null || value.trim().isEmpty
-                            ? 'Name is required'
-                            : null,
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                                ? 'Name is required'
+                                : null,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -183,10 +188,14 @@ class _ModulesScreenState extends State<ModulesScreen> {
                       SwitchListTile.adaptive(
                         contentPadding: EdgeInsets.zero,
                         title: const Text('Active'),
-                        subtitle: const Text('Make this module visible to students'),
+                        subtitle: const Text(
+                          'Make this module visible to students',
+                        ),
                         value: isActive,
                         onChanged: (value) {
-                          setDialogState(() => isActive = value);
+                          setDialogState(() {
+                            isActive = value;
+                          });
                         },
                       ),
                     ],
@@ -236,9 +245,12 @@ class _ModulesScreenState extends State<ModulesScreen> {
                     Navigator.pop(dialogContext);
 
                     final future = _loadData();
-                    setState(() => _future = future);
+                    setState(() {
+                      _future = future;
+                    });
 
-                    ScaffoldMessenger.of(this.context).showSnackBar(
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
                           module == null ? 'Module added' : 'Module updated',
@@ -252,8 +264,12 @@ class _ModulesScreenState extends State<ModulesScreen> {
                     );
                   }
                 },
-                icon: Icon(module == null ? Icons.add : Icons.save_outlined),
-                label: Text(module == null ? 'Add Module' : 'Save Changes'),
+                icon: Icon(
+                  module == null ? Icons.add : Icons.save_outlined,
+                ),
+                label: Text(
+                  module == null ? 'Add Module' : 'Save Changes',
+                ),
               ),
             ],
           ),
@@ -276,7 +292,9 @@ class _ModulesScreenState extends State<ModulesScreen> {
       if (!mounted) return;
 
       final future = _loadData();
-      setState(() => _future = future);
+      setState(() {
+        _future = future;
+      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -391,7 +409,9 @@ class _ModulesScreenState extends State<ModulesScreen> {
                       );
                       final levelFilter = DropdownButtonFormField<String>(
                         initialValue: _selectedLevelId,
-                        decoration: const InputDecoration(labelText: 'Academic Level'),
+                        decoration: const InputDecoration(
+                          labelText: 'Academic Level',
+                        ),
                         items: [
                           const DropdownMenuItem<String>(
                             value: null,
@@ -404,18 +424,35 @@ class _ModulesScreenState extends State<ModulesScreen> {
                             ),
                           ),
                         ],
-                        onChanged: (value) => setState(() => _selectedLevelId = value),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedLevelId = value;
+                          });
+                        },
                       );
                       final statusFilter = DropdownButtonFormField<String>(
                         initialValue: _status,
                         decoration: const InputDecoration(labelText: 'Status'),
                         items: const [
-                          DropdownMenuItem(value: 'All', child: Text('All Statuses')),
-                          DropdownMenuItem(value: 'Active', child: Text('Active')),
-                          DropdownMenuItem(value: 'Inactive', child: Text('Inactive')),
+                          DropdownMenuItem(
+                            value: 'All',
+                            child: Text('All Statuses'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Active',
+                            child: Text('Active'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'Inactive',
+                            child: Text('Inactive'),
+                          ),
                         ],
                         onChanged: (value) {
-                          if (value != null) setState(() => _status = value);
+                          if (value != null) {
+                            setState(() {
+                              _status = value;
+                            });
+                          }
                         },
                       );
 
@@ -460,7 +497,10 @@ class _ModulesScreenState extends State<ModulesScreen> {
                           final module = modules[index];
                           return _ModuleCard(
                             module: module,
-                            levelName: _levelName(module.academicLevelId, data.levels),
+                            levelName: _levelName(
+                              module.academicLevelId,
+                              data.levels,
+                            ),
                             onEdit: () => _showModuleDialog(module: module),
                             onToggle: () => _toggleActive(module),
                           );
@@ -487,7 +527,11 @@ class _StatCard extends StatelessWidget {
   final String label;
   final String value;
 
-  const _StatCard({required this.icon, required this.label, required this.value});
+  const _StatCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -695,6 +739,7 @@ class _EmptyModules extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
