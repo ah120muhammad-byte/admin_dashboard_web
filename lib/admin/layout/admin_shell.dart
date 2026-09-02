@@ -1,5 +1,6 @@
 import 'package:admin_dashboard_web/admin/screens/exams/exam_attempts_screen.dart';
 import 'package:admin_dashboard_web/admin/screens/exams/exams_management_screen.dart';
+import 'package:admin_dashboard_web/admin/screens/exams/student_exam_performance_screen.dart';
 import 'package:admin_dashboard_web/admin/screens/files/module_files_picker_screen.dart';
 import 'package:admin_dashboard_web/admin/screens/notifications/notifications_screen.dart';
 import 'package:admin_dashboard_web/admin/screens/settings/settings_screen.dart';
@@ -36,6 +37,7 @@ class _AdminShellState extends State<AdminShell> {
     SettingsScreen(),
     ExamsManagementScreen(),
     ExamAttemptsScreen(),
+    StudentExamPerformanceScreen(),
   ];
 
   final List<String> _titles = const [
@@ -49,14 +51,13 @@ class _AdminShellState extends State<AdminShell> {
     'Settings',
     'Exams',
     'Exam Attempts',
+    'Student Performance',
   ];
 
   Future<void> _logout() async {
     try {
       await Supabase.instance.client.auth.signOut();
-    } catch (_) {
-      // Even if sign out fails, do not keep the admin UI on screen.
-    }
+    } catch (_) {}
 
     if (!mounted) return;
 
