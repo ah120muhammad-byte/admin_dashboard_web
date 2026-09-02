@@ -12,8 +12,7 @@ class NotificationManagementScreenV2 extends StatefulWidget {
 
 class _NotificationManagementScreenV2State
     extends State<NotificationManagementScreenV2> {
-  final AdminNotificationService _service =
-      AdminNotificationService.instance;
+  final AdminNotificationService _service = AdminNotificationService.instance;
   final TextEditingController _searchController = TextEditingController();
 
   late Future<_PageData> _future;
@@ -223,7 +222,9 @@ class _NotificationManagementScreenV2State
               : data.notifications.where((notification) {
                   return notification.title.toLowerCase().contains(_search) ||
                       notification.body.toLowerCase().contains(_search) ||
-                      _typeLabel(notification.type).toLowerCase().contains(_search);
+                      _typeLabel(
+                        notification.type,
+                      ).toLowerCase().contains(_search);
                 }).toList();
 
           final counts = <String, int>{};
@@ -277,10 +278,26 @@ class _NotificationManagementScreenV2State
                       spacing: 10,
                       runSpacing: 10,
                       children: [
-                        _Metric('Total', '${data.notifications.length}', Icons.notifications_outlined),
-                        _Metric('New Lecture', '${counts['new_lecture'] ?? 0}', Icons.menu_book_outlined),
-                        _Metric('New Exam', '${counts['new_exam'] ?? 0}', Icons.quiz_outlined),
-                        _Metric('App Update', '${counts['app_update'] ?? 0}', Icons.system_update_outlined),
+                        _Metric(
+                          'Total',
+                          '${data.notifications.length}',
+                          Icons.notifications_outlined,
+                        ),
+                        _Metric(
+                          'New Lecture',
+                          '${counts['new_lecture'] ?? 0}',
+                          Icons.menu_book_outlined,
+                        ),
+                        _Metric(
+                          'New Exam',
+                          '${counts['new_exam'] ?? 0}',
+                          Icons.quiz_outlined,
+                        ),
+                        _Metric(
+                          'App Update',
+                          '${counts['app_update'] ?? 0}',
+                          Icons.system_update_outlined,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 14),
@@ -326,20 +343,27 @@ class _NotificationManagementScreenV2State
                                   const SizedBox(width: 14),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Row(
                                           children: [
                                             Expanded(
                                               child: Text(
                                                 notification.title,
-                                                style: theme.textTheme.titleMedium?.copyWith(
-                                                  fontWeight: FontWeight.w700,
-                                                ),
+                                                style: theme
+                                                    .textTheme
+                                                    .titleMedium
+                                                    ?.copyWith(
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
                                               ),
                                             ),
                                             Chip(
-                                              label: Text(_typeLabel(notification.type)),
+                                              label: Text(
+                                                _typeLabel(notification.type),
+                                              ),
                                             ),
                                           ],
                                         ),
@@ -347,10 +371,14 @@ class _NotificationManagementScreenV2State
                                         Text(notification.body),
                                         const SizedBox(height: 10),
                                         Text(
-                                          _lectureName(data.lectures, notification.lectureId),
-                                          style: theme.textTheme.bodySmall?.copyWith(
-                                            color: scheme.onSurfaceVariant,
+                                          _lectureName(
+                                            data.lectures,
+                                            notification.lectureId,
                                           ),
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(
+                                                color: scheme.onSurfaceVariant,
+                                              ),
                                         ),
                                       ],
                                     ),
@@ -358,7 +386,9 @@ class _NotificationManagementScreenV2State
                                   IconButton(
                                     tooltip: 'Delete',
                                     onPressed: () => _delete(notification),
-                                    icon: const Icon(Icons.delete_outline_rounded),
+                                    icon: const Icon(
+                                      Icons.delete_outline_rounded,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -403,7 +433,12 @@ class _Metric extends StatelessWidget {
             const SizedBox(width: 8),
             Text(label, style: theme.textTheme.bodySmall),
             const SizedBox(width: 8),
-            Text(value, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+            Text(
+              value,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
         ),
       ),
@@ -482,21 +517,23 @@ class _NotificationDialogState extends State<_NotificationDialog> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unable to load students: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Unable to load students: $e')));
       }
     } finally {
-      if (!mounted) return;
-      setState(() {
-        _loadingStudents = false;
-      });
+      if (mounted) {
+        setState(() {
+          _loadingStudents = false;
+        });
+      }
     }
   }
 
   void _save() {
     if (!_formKey.currentState!.validate()) return;
-    if ((_typeNeedsLecture || _audienceNeedsLecture) && _lectureId == null) return;
+    if ((_typeNeedsLecture || _audienceNeedsLecture) && _lectureId == null)
+      return;
     if (_audience == 'specific' && _selected.isEmpty) return;
 
     Navigator.of(context).pop(
@@ -505,7 +542,9 @@ class _NotificationDialogState extends State<_NotificationDialog> {
         body: _body.text.trim(),
         type: _type,
         audience: _audience,
-        lectureId: _typeNeedsLecture || _audienceNeedsLecture ? _lectureId : null,
+        lectureId: _typeNeedsLecture || _audienceNeedsLecture
+            ? _lectureId
+            : null,
         inactiveDays: _inactiveDays,
         selectedUserIds: _selected.toList(),
       ),
@@ -559,9 +598,18 @@ class _NotificationDialogState extends State<_NotificationDialog> {
                   ),
                   items: const [
                     DropdownMenuItem(value: 'general', child: Text('General')),
-                    DropdownMenuItem(value: 'new_lecture', child: Text('New Lecture')),
-                    DropdownMenuItem(value: 'new_exam', child: Text('New Exam')),
-                    DropdownMenuItem(value: 'app_update', child: Text('App Update')),
+                    DropdownMenuItem(
+                      value: 'new_lecture',
+                      child: Text('New Lecture'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'new_exam',
+                      child: Text('New Exam'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'app_update',
+                      child: Text('App Update'),
+                    ),
                   ],
                   onChanged: (value) {
                     setState(() {
@@ -596,7 +644,8 @@ class _NotificationDialogState extends State<_NotificationDialog> {
                         _lectureId = value;
                       });
                     },
-                    validator: (value) => needsLecture && (value == null || value.isEmpty)
+                    validator: (value) =>
+                        needsLecture && (value == null || value.isEmpty)
                         ? 'Select a lecture'
                         : null,
                   ),
@@ -607,8 +656,8 @@ class _NotificationDialogState extends State<_NotificationDialog> {
                   child: Text(
                     'Audience',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -620,10 +669,22 @@ class _NotificationDialogState extends State<_NotificationDialog> {
                   ),
                   items: const [
                     DropdownMenuItem(value: 'all', child: Text('All students')),
-                    DropdownMenuItem(value: 'specific', child: Text('Specific students')),
-                    DropdownMenuItem(value: 'inactive', child: Text('Inactive students')),
-                    DropdownMenuItem(value: 'not_opened', child: Text('Did not open a lecture')),
-                    DropdownMenuItem(value: 'behind', child: Text('Behind / incomplete')),
+                    DropdownMenuItem(
+                      value: 'specific',
+                      child: Text('Specific students'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'inactive',
+                      child: Text('Inactive students'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'not_opened',
+                      child: Text('Did not open a lecture'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'behind',
+                      child: Text('Behind / incomplete'),
+                    ),
                   ],
                   onChanged: (value) {
                     setState(() {
@@ -688,27 +749,31 @@ class _NotificationDialogState extends State<_NotificationDialog> {
                       child: _loadingStudents
                           ? const Center(child: CircularProgressIndicator())
                           : _students.isEmpty
-                              ? const Center(child: Text('Load students to select recipients.'))
-                              : ListView.builder(
-                                  itemCount: _students.length,
-                                  itemBuilder: (context, index) {
-                                    final student = _students[index];
-                                    return CheckboxListTile(
-                                      value: _selected.contains(student.id),
-                                      onChanged: (value) {
-                                        setState(() {
-                                          if (value == true) {
-                                            _selected.add(student.id);
-                                          } else {
-                                            _selected.remove(student.id);
-                                          }
-                                        });
-                                      },
-                                      title: Text(student.fullName),
-                                      subtitle: Text(student.email),
-                                    );
+                          ? const Center(
+                              child: Text(
+                                'Load students to select recipients.',
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: _students.length,
+                              itemBuilder: (context, index) {
+                                final student = _students[index];
+                                return CheckboxListTile(
+                                  value: _selected.contains(student.id),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      if (value == true) {
+                                        _selected.add(student.id);
+                                      } else {
+                                        _selected.remove(student.id);
+                                      }
+                                    });
                                   },
-                                ),
+                                  title: Text(student.fullName),
+                                  subtitle: Text(student.email),
+                                );
+                              },
+                            ),
                     ),
                   ),
                   Align(
