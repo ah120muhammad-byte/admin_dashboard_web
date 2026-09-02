@@ -3,7 +3,6 @@ import 'package:admin_dashboard_web/admin/screens/files/lecture_content_screen.d
 import 'package:admin_dashboard_web/admin/screens/lectures/lectures_screen.dart';
 import 'package:admin_dashboard_web/admin/screens/notifications/notifications_screen.dart';
 import 'package:admin_dashboard_web/admin/screens/settings/settings_screen.dart';
-import 'package:admin_dashboard_web/admin/screens/users/users_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../admin/screens/dashboard/dashboard_screen.dart';
@@ -11,7 +10,7 @@ import 'package:admin_dashboard_web/admin/screens/levels/academic_levels_screen.
 import '../../admin/screens/modules/modules_screen.dart';
 import '../screens/exams/exams_screen.dart';
 import '../screens/admin_login_screen.dart';
-import '../screens/users/user_analytics_charts.dart';
+import '../screens/users/users_analytics_dashboard.dart';
 import 'admin_sidebar.dart';
 import 'admin_top_bar.dart';
 
