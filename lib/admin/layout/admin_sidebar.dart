@@ -36,6 +36,44 @@ class AdminSidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final items = <Widget>[];
+
+    if (!compact) {
+      items.addAll([
+        const _SectionLabel('OVERVIEW'),
+        _item(context, 0),
+        const _SectionGap(),
+        const _SectionLabel('CONTENT'),
+        _item(context, 2),
+        _item(context, 3),
+        _item(context, 4),
+        _item(context, 5),
+        const _SectionGap(),
+        const _SectionLabel('USER MANAGEMENT'),
+        _item(context, 1),
+        _item(context, 6),
+        const _SectionGap(),
+        const _SectionLabel('ASSESSMENT'),
+        _item(context, 8),
+        _item(context, 9),
+        if (analyticsEnabled) _item(context, 10),
+        const _SectionGap(),
+        const _SectionLabel('SYSTEM'),
+        _item(context, 7),
+        const _SectionGap(),
+        const _SectionLabel('MAINTENANCE'),
+        _item(context, 11),
+      ]);
+    } else {
+      const compactOrder = [0, 1, 2, 3, 4, 5, 6, 8, 9, 7, 11];
+      for (final index in compactOrder) {
+        if (index == 9 && !analyticsEnabled) continue;
+        if (index == 10 && !analyticsEnabled) continue;
+        items.add(_item(context, index));
+      }
+      if (analyticsEnabled) items.insert(8, _item(context, 10));
+    }
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       width: compact ? 78 : 250,
@@ -80,46 +118,7 @@ class AdminSidebar extends StatelessWidget {
             Expanded(
               child: ListView(
                 padding: EdgeInsets.fromLTRB(compact ? 8 : 12, 0, compact ? 8 : 12, 16),
-                children: [
-                  if (!compact) const _SectionLabel('OVERVIEW'),
-                  _item(context, 0),
-                  const _SectionGap(),
-                  if (!compact) const _SectionLabel('CONTENT'),
-                  _item(context, 2),
-                  _item(context, 3),
-                  _item(context, 4),
-                  _item(context, 5),
-                  const _SectionGap(),
-                  if (!compact) const _SectionLabel('USER MANAGEMENT'),
-                  _item(context, 1),
-                  _item(context, 6),
-                  const _SectionGap(),
-                  if (!compact) const _SectionLabel('ASSESSMENT'),
-                  _item(context, 8),
-                  _item(context, 9),
-                  if (analyticsEnabled) _item(context, 10),
-                  const _SectionGap(),
-                  if (!compact) const _SectionLabel('SYSTEM'),
-                  _item(context, 7),
-                  if (!compact) ...[
-                    _SectionGap(),
-                    const _SectionLabel('MAINTENANCE'),
-                  ],
-                  _item(context, 11),
-                  if (compact) ...[
-                    _item(context, 1),
-                    _item(context, 2),
-                    _item(context, 3),
-                    _item(context, 4),
-                    _item(context, 5),
-                    _item(context, 6),
-                    _item(context, 8),
-                    _item(context, 9),
-                    if (analyticsEnabled) _item(context, 10),
-                    _item(context, 7),
-                    _item(context, 11),
-                  ],
-                ],
+                children: items,
               ),
             ),
             const Divider(height: 1),
