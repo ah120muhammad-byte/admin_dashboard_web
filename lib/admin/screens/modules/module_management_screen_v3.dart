@@ -51,6 +51,19 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
     await future;
   }
 
+  List<String> _extensionsForType(String type) {
+    switch (type.toLowerCase()) {
+      case 'pdf':
+        return ['pdf'];
+      case 'audio':
+        return ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac'];
+      case 'video':
+        return ['mp4', 'mov', 'm4v', 'webm', 'avi', 'mkv'];
+      default:
+        return <String>[];
+    }
+  }
+
   Future<void> _editLecture({AdminLecture? lecture}) async {
     final title = TextEditingController(text: lecture?.title ?? '');
     final description = TextEditingController(text: lecture?.description ?? '');
@@ -163,12 +176,7 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
   Future<void> _addFile(AdminLecture lecture, String type) async {
     if (_busy) return;
 
-    final extensions = switch (type) {
-      'pdf' => ['pdf'],
-      'audio' => ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac'],
-      'video' => ['mp4', 'mov', 'm4v', 'webm', 'avi', 'mkv'],
-      _ => <String>[],
-    };
+    final extensions = _extensionsForType(type);
 
     setState(() {
       _busy = true;
@@ -248,6 +256,72 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
       }
     } catch (e) {
       if (mounted) _message('Upload failed: $e', error: true);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _replaceFile(LectureFileItem file) async {
+    if (_busy) return;
+
+    final extensions = _extensionsForType(file.fileType);
+    setState(() {
+      _busy = true;
+    });
+
+    try {
+      final picked = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: extensions,
+        withData: true,
+      );
+
+      if (!mounted || picked == null || picked.files.isEmpty) return;
+
+      final selected = picked.files.single;
+      final bytes = selected.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        _message('Unable to read the selected file.', error: true);
+        return;
+      }
+
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Replace File'),
+          content: Text(
+            'Replace "${file.title}" with "${selected.name}"? The old storage file will be removed after the new file is linked.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Replace'),
+            ),
+          ],
+        ),
+      );
+
+      if (!mounted || confirmed != true) return;
+
+      await _files.replaceLectureFile(
+        file: file,
+        bytes: bytes,
+        newFileName: selected.name,
+      );
+
+      if (!mounted) return;
+      _message('${file.fileType.toUpperCase()} replaced successfully.');
+      await _refresh();
+    } catch (e) {
+      if (mounted) _message('Replace failed: $e', error: true);
     } finally {
       if (mounted) {
         setState(() {
@@ -461,6 +535,7 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
                             onActive: () => _toggleLecture(lecture, false),
                             onAddFile: (type) => _addFile(lecture, type),
                             onOpenFile: _openFile,
+                            onReplaceFile: _replaceFile,
                             onDeleteFile: _deleteFile,
                             busy: _busy,
                           );
@@ -484,6 +559,7 @@ class _LectureExpansion extends StatefulWidget {
   final VoidCallback onActive;
   final ValueChanged<String> onAddFile;
   final Future<void> Function(LectureFileItem) onOpenFile;
+  final Future<void> Function(LectureFileItem) onReplaceFile;
   final Future<void> Function(LectureFileItem) onDeleteFile;
   final bool busy;
 
@@ -496,6 +572,7 @@ class _LectureExpansion extends StatefulWidget {
     required this.onActive,
     required this.onAddFile,
     required this.onOpenFile,
+    required this.onReplaceFile,
     required this.onDeleteFile,
     required this.busy,
   });
@@ -680,19 +757,30 @@ class _LectureExpansionState extends State<_LectureExpansion> {
                               overflow: TextOverflow.ellipsis,
                             ),
                             subtitle: Text(
-                              '${file.fileType.toUpperCase()} • order ${file.displayOrder}',
+                              '${file.fileType.toUpperCase()} • order ${file.displayOrder} • ${file.isActive ? 'Active' : 'Inactive'}',
                             ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
                                   tooltip: 'Open',
-                                  onPressed: () => widget.onOpenFile(file),
+                                  onPressed: widget.busy
+                                      ? null
+                                      : () => widget.onOpenFile(file),
                                   icon: const Icon(Icons.open_in_new_rounded),
                                 ),
                                 IconButton(
+                                  tooltip: 'Replace / Switch File',
+                                  onPressed: widget.busy
+                                      ? null
+                                      : () => widget.onReplaceFile(file),
+                                  icon: const Icon(Icons.swap_horiz_rounded),
+                                ),
+                                IconButton(
                                   tooltip: 'Delete',
-                                  onPressed: () => widget.onDeleteFile(file),
+                                  onPressed: widget.busy
+                                      ? null
+                                      : () => widget.onDeleteFile(file),
                                   icon: const Icon(Icons.delete_outline_rounded),
                                 ),
                               ],

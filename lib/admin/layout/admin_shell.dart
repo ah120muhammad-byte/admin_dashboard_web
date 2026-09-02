@@ -154,7 +154,17 @@ class _AdminShellState extends State<AdminShell> {
                     onThemeToggle: _toggleTheme,
                   ),
                   Expanded(
-                    child: IndexedStack(index: _selectedIndex, children: _pages),
+                    child: IndexedStack(
+                      index: _selectedIndex,
+                      children: _pages.map((page) {
+                        if (page is SettingsScreenV2) {
+                          return SettingsScreenV2(
+                            onThemeModeChanged: _setThemeMode,
+                          );
+                        }
+                        return page;
+                      }).toList(),
+                    ),
                   ),
                 ],
               ),
