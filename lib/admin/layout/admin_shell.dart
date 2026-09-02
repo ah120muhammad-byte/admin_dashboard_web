@@ -73,6 +73,10 @@ class _AdminShellState extends State<AdminShell> {
     _themeMode = widget.settings.themeMode;
   }
 
+  ThemeData _currentTheme(BuildContext context) {
+    return _themeMode == 'dark' ? AdminTheme.darkTheme : AdminTheme.lightTheme;
+  }
+
   void _setThemeMode(String mode) {
     if (mode != 'light' && mode != 'dark' && mode != 'system') {
       return;
@@ -101,8 +105,10 @@ class _AdminShellState extends State<AdminShell> {
   }
 
   void _toggleTheme() {
-    final brightness = Theme.of(context).brightness;
-    _setThemeMode(brightness == Brightness.dark ? 'light' : 'dark');
+    final isDark = _themeMode == 'dark' ||
+        (_themeMode == 'system' &&
+            Theme.of(context).brightness == Brightness.dark);
+    _setThemeMode(isDark ? 'light' : 'dark');
   }
 
   Future<void> _logout() async {
@@ -127,36 +133,45 @@ class _AdminShellState extends State<AdminShell> {
       analyticsEnabled: widget.settings.analyticsEnabled,
     );
 
-    return Scaffold(
-      body: Row(
-        children: [
-          AdminSidebar(
-            selectedIndex: _selectedIndex,
-            compact: effectiveSettings.sidebarCompact,
-            analyticsEnabled: effectiveSettings.analyticsEnabled,
-            onItemSelected: (index) => setState(() {
-              _selectedIndex = index;
-            }),
-            onLogout: _logout,
-          ),
-          Expanded(
-            child: Column(
-              children: [
-                AdminTopBar(
-                  title: _titles[_selectedIndex],
-                  isDarkMode: Theme.of(context).brightness == Brightness.dark,
-                  onToggleTheme: _toggleTheme,
-                ),
-                Expanded(
-                  child: IndexedStack(
-                    index: _selectedIndex,
-                    children: _pages,
-                  ),
-                ),
-              ],
+    final inheritedBrightness = Theme.of(context).brightness;
+    final isDark = _themeMode == 'dark' ||
+        (_themeMode == 'system' && inheritedBrightness == Brightness.dark);
+
+    return Theme(
+      data: _themeMode == 'system'
+          ? Theme.of(context)
+          : _currentTheme(context),
+      child: Scaffold(
+        body: Row(
+          children: [
+            AdminSidebar(
+              selectedIndex: _selectedIndex,
+              compact: effectiveSettings.sidebarCompact,
+              analyticsEnabled: effectiveSettings.analyticsEnabled,
+              onItemSelected: (index) => setState(() {
+                _selectedIndex = index;
+              }),
+              onLogout: _logout,
             ),
-          ),
-        ],
+            Expanded(
+              child: Column(
+                children: [
+                  AdminTopBar(
+                    title: _titles[_selectedIndex],
+                    isDark: isDark,
+                    onThemeToggle: _toggleTheme,
+                  ),
+                  Expanded(
+                    child: IndexedStack(
+                      index: _selectedIndex,
+                      children: _pages,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
