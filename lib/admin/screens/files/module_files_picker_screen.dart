@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/services/lectures_service.dart';
-import 'module_files_management_screen.dart';
+import 'module_files_management_screen_v2.dart';
 
 class ModuleFilesPickerScreen extends StatefulWidget {
   const ModuleFilesPickerScreen({super.key});
@@ -33,7 +33,7 @@ class _ModuleFilesPickerScreenState extends State<ModuleFilesPickerScreen> {
   void _onSearch() {
     final value = _searchController.text.trim().toLowerCase();
     if (value == _search) return;
-    setState(() => _search = value);
+    setState(() { _search = value; });
   }
 
   Future<_PickerData> _load() async {
@@ -50,22 +50,19 @@ class _ModuleFilesPickerScreenState extends State<ModuleFilesPickerScreen> {
   Future<void> _refresh() async {
     final future = _load();
     if (!mounted) return;
-    setState(() => _future = future);
+    setState(() { _future = future; });
     await future;
   }
 
   void _openModule(LectureModule module) {
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ModuleFilesManagementScreen(module: module),
-      ),
+      MaterialPageRoute(builder: (_) => ModuleFilesManagementScreen(module: module)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return FutureBuilder<_PickerData>(
       future: _future,
       builder: (context, snapshot) {
@@ -73,20 +70,10 @@ class _ModuleFilesPickerScreenState extends State<ModuleFilesPickerScreen> {
           return const Center(child: CircularProgressIndicator());
         }
         if (snapshot.hasError || snapshot.data == null) {
-          return Center(
-            child: FilledButton.icon(
-              onPressed: _refresh,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Try Again'),
-            ),
-          );
+          return Center(child: FilledButton.icon(onPressed: _refresh, icon: const Icon(Icons.refresh_rounded), label: const Text('Try Again')));
         }
-
         final data = snapshot.data!;
-        final modules = _search.isEmpty
-            ? data.modules
-            : data.modules.where((m) => m.name.toLowerCase().contains(_search)).toList();
-
+        final modules = _search.isEmpty ? data.modules : data.modules.where((m) => m.name.toLowerCase().contains(_search)).toList();
         return Column(
           children: [
             Padding(
@@ -95,27 +82,19 @@ class _ModuleFilesPickerScreenState extends State<ModuleFilesPickerScreen> {
                 children: [
                   Row(
                     children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Files & Downloads', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
-                            const SizedBox(height: 4),
-                            Text('Select a module to manage its PDF, audio and video files.', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
-                          ],
-                        ),
-                      ),
+                      Expanded(child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Files & Downloads', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+                          const SizedBox(height: 4),
+                          Text('Select a module to manage its PDF, audio and video files.', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+                        ],
+                      )),
                       IconButton(tooltip: 'Refresh', onPressed: _refresh, icon: const Icon(Icons.refresh_rounded)),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  TextField(
-                    controller: _searchController,
-                    decoration: const InputDecoration(
-                      hintText: 'Search modules...',
-                      prefixIcon: Icon(Icons.search_rounded),
-                    ),
-                  ),
+                  TextField(controller: _searchController, decoration: const InputDecoration(hintText: 'Search modules...', prefixIcon: Icon(Icons.search_rounded))),
                 ],
               ),
             ),
@@ -127,21 +106,12 @@ class _ModuleFilesPickerScreenState extends State<ModuleFilesPickerScreen> {
                       onRefresh: _refresh,
                       child: GridView.builder(
                         padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-                        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 420,
-                          mainAxisExtent: 220,
-                          crossAxisSpacing: 14,
-                          mainAxisSpacing: 14,
-                        ),
+                        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 420, mainAxisExtent: 220, crossAxisSpacing: 14, mainAxisSpacing: 14),
                         itemCount: modules.length,
                         itemBuilder: (context, index) {
                           final module = modules[index];
-                          final lectureIds = data.lectures.where((l) => l.moduleId == module.id).map((l) => l.id).toSet();
-                          return _ModuleCard(
-                            module: module,
-                            lectures: data.lectures.where((l) => l.moduleId == module.id).length,
-                            onTap: () => _openModule(module),
-                          );
+                          final count = data.lectures.where((l) => l.moduleId == module.id).length;
+                          return _ModuleCard(module: module, lectures: count, onTap: () => _openModule(module));
                         },
                       ),
                     ),
@@ -163,7 +133,6 @@ class _ModuleCard extends StatelessWidget {
   final LectureModule module;
   final int lectures;
   final VoidCallback onTap;
-
   const _ModuleCard({required this.module, required this.lectures, required this.onTap});
 
   @override
@@ -180,19 +149,12 @@ class _ModuleCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 54,
-                    height: 54,
-                    decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(14)),
-                    child: Icon(Icons.folder_rounded, color: scheme.primary),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(child: Text(module.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700))),
-                  Icon(Icons.arrow_forward_ios_rounded, size: 16, color: scheme.onSurfaceVariant),
-                ],
-              ),
+              Row(children: [
+                Container(width: 54, height: 54, decoration: BoxDecoration(color: scheme.primaryContainer, borderRadius: BorderRadius.circular(14)), child: Icon(Icons.folder_rounded, color: scheme.primary)),
+                const SizedBox(width: 14),
+                Expanded(child: Text(module.name, maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700))),
+                Icon(Icons.arrow_forward_ios_rounded, size: 16, color: scheme.onSurfaceVariant),
+              ]),
               const Spacer(),
               Text('$lectures ${lectures == 1 ? 'lecture' : 'lectures'}', style: theme.textTheme.bodyMedium),
               const SizedBox(height: 6),
