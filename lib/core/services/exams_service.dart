@@ -184,7 +184,26 @@ class ExamsService {
         .select('id')
         .single();
 
-    return response['id'] as String;
+    final examId = response['id'] as String;
+
+    // Notification failure must not invalidate a successfully created exam.
+    try {
+      await _supabase.functions.invoke(
+        'send-broadcast-notification',
+        body: {
+          'title': 'New exam available',
+          'body': 'A new exam "$title" is now available.',
+          'type': 'new_exam',
+          'lectureId': lectureId,
+          'examId': examId,
+        },
+      );
+    } catch (_) {
+      // The exam was created successfully. A notification failure should not
+      // roll back or block exam creation.
+    }
+
+    return examId;
   }
 
   // ==========================================================================
