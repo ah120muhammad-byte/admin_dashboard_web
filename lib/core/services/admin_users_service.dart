@@ -199,9 +199,9 @@ class AdminUsersService {
         continue;
       }
 
-      progressByUser
-          .putIfAbsent(userId, () => [])
-          .add(Map<String, dynamic>.from(item));
+      progressByUser.putIfAbsent(userId, () => []).add(
+            Map<String, dynamic>.from(item),
+          );
     }
 
     // ------------------------------------------------------------------------
@@ -217,9 +217,9 @@ class AdminUsersService {
         continue;
       }
 
-      attemptsByUser
-          .putIfAbsent(userId, () => [])
-          .add(Map<String, dynamic>.from(item));
+      attemptsByUser.putIfAbsent(userId, () => []).add(
+            Map<String, dynamic>.from(item),
+          );
     }
 
     // ------------------------------------------------------------------------
@@ -236,7 +236,6 @@ class AdminUsersService {
       }
 
       final progress = progressByUser[userId] ?? [];
-
       final attempts = attemptsByUser[userId] ?? [];
 
       users.add(
@@ -268,14 +267,18 @@ class AdminUsersService {
   }) {
     final userId = profile['id']?.toString() ?? '';
 
-    final name = _stringValue(profile['full_name'], fallback: 'Unknown User');
+    final name = _stringValue(
+      profile['full_name'],
+      fallback: 'Unknown User',
+    );
 
-    final email = _stringValue(profile['email'], fallback: '');
+    final email = _stringValue(
+      profile['email'],
+      fallback: '',
+    );
 
     final imageUrl = _nullableString(profile['profile_image_url']);
-
     final role = _stringValue(profile['role'], fallback: 'user');
-
     final createdAt = _parseDate(profile['created_at']);
 
     // ------------------------------------------------------------------------
@@ -287,17 +290,9 @@ class AdminUsersService {
     var videosCompleted = 0;
     var audiosCompleted = 0;
 
-    final lectureIds = <String>{};
-
     DateTime? lastLectureActivity;
 
     for (final item in progress) {
-      final lectureId = item['lecture_id']?.toString();
-
-      if (lectureId != null && lectureId.isNotEmpty) {
-        lectureIds.add(lectureId);
-      }
-
       if (_boolValue(item['video_completed'])) {
         videosCompleted++;
       }
@@ -307,9 +302,13 @@ class AdminUsersService {
       }
 
       final activityDate =
-          _parseDate(item['last_opened_at']) ?? _parseDate(item['updated_at']);
+          _parseDate(item['last_opened_at']) ??
+          _parseDate(item['updated_at']);
 
-      lastLectureActivity = _latestDate(lastLectureActivity, activityDate);
+      lastLectureActivity = _latestDate(
+        lastLectureActivity,
+        activityDate,
+      );
     }
 
     final lecturesInProgress = _calculateLecturesInProgress(progress);
@@ -320,7 +319,18 @@ class AdminUsersService {
 
     final examAttempts = attempts.length;
 
-    var completedExams = 0;
+    // Analytics that represent scores should only use completed attempts.
+    // An in-progress attempt normally has score=0 and must not drag the
+    // student's average down while the exam is still being taken.
+    final completedAttempts = attempts.where((attempt) {
+      final status = attempt['status']?.toString().toLowerCase();
+      final completedAt = _parseDate(attempt['completed_at']);
+
+      return status == 'completed' || completedAt != null;
+    }).toList();
+
+    final completedExams = completedAttempts.length;
+
     var totalCorrectAnswers = 0;
     var totalQuestions = 0;
 
@@ -330,50 +340,46 @@ class AdminUsersService {
     DateTime? lastExamActivity;
 
     for (final attempt in attempts) {
-      final status = attempt['status']?.toString().toLowerCase();
-
       final completedAt = _parseDate(attempt['completed_at']);
-
-      if (status == 'completed' || completedAt != null) {
-        completedExams++;
-      }
-
-      final correct = _intValue(attempt['correct_answers']);
-
-      final questions = _intValue(attempt['total_questions']);
-
-      totalCorrectAnswers += correct;
-      totalQuestions += questions;
-
-      final score = _doubleValue(attempt['score']);
-
-      scoreSum += score;
-
-      if (score > bestScore) {
-        bestScore = score;
-      }
 
       final activityDate =
           completedAt ??
           _parseDate(attempt['created_at']) ??
           _parseDate(attempt['started_at']);
 
-      lastExamActivity = _latestDate(lastExamActivity, activityDate);
+      lastExamActivity = _latestDate(
+        lastExamActivity,
+        activityDate,
+      );
     }
 
-    final double averageScore = examAttempts > 0
-        ? scoreSum / examAttempts
+    for (final attempt in completedAttempts) {
+      final correct = _intValue(attempt['correct_answers']);
+      final questions = _intValue(attempt['total_questions']);
+
+      totalCorrectAnswers += correct;
+      totalQuestions += questions;
+
+      final score = _doubleValue(attempt['score']);
+      scoreSum += score;
+
+      if (score > bestScore) {
+        bestScore = score;
+      }
+    }
+
+    final double averageScore = completedAttempts.isNotEmpty
+        ? scoreSum / completedAttempts.length
         : 0.0;
 
     final double successRate = totalQuestions > 0
         ? (totalCorrectAnswers / totalQuestions) * 100
         : 0.0;
 
-    // ------------------------------------------------------------------------
-    // GENERAL ACTIVITY
-    // ------------------------------------------------------------------------
-
-    final lastActivity = _latestDate(lastLectureActivity, lastExamActivity);
+    final lastActivity = _latestDate(
+      lastLectureActivity,
+      lastExamActivity,
+    );
 
     return AdminUserAnalytics(
       id: userId,
@@ -382,33 +388,19 @@ class AdminUsersService {
       imageUrl: imageUrl,
       role: role,
       createdAt: createdAt,
-
       lecturesOpened: lecturesOpened,
-
       videosCompleted: videosCompleted,
-
       audiosCompleted: audiosCompleted,
-
       lecturesInProgress: lecturesInProgress,
-
       lastLectureActivity: lastLectureActivity,
-
       examAttempts: examAttempts,
-
       completedExams: completedExams,
-
       averageScore: averageScore,
-
       bestScore: bestScore,
-
       correctAnswers: totalCorrectAnswers,
-
       totalQuestions: totalQuestions,
-
       successRate: successRate,
-
       lastExamActivity: lastExamActivity,
-
       lastActivity: lastActivity,
     );
   }
@@ -449,20 +441,15 @@ class AdminUsersService {
       }
 
       totalLecturesOpened += user.lecturesOpened;
-
       totalVideosCompleted += user.videosCompleted;
-
       totalAudiosCompleted += user.audiosCompleted;
-
       totalExamAttempts += user.examAttempts;
-
       completedExams += user.completedExams;
-
       totalCorrectAnswers += user.correctAnswers;
-
       totalQuestions += user.totalQuestions;
 
-      if (user.examAttempts > 0) {
+      // User averageScore already excludes in-progress attempts.
+      if (user.completedExams > 0) {
         scoreSum += user.averageScore;
         usersWithScores++;
       }
@@ -478,31 +465,18 @@ class AdminUsersService {
 
     return AdminUsersStats(
       totalUsers: users.length,
-
       activeUsers: activeUsers,
-
       inactiveUsers: users.length - activeUsers,
-
       usersWithLectureActivity: usersWithLectureActivity,
-
       usersWithExamActivity: usersWithExamActivity,
-
       totalLecturesOpened: totalLecturesOpened,
-
       totalVideosCompleted: totalVideosCompleted,
-
       totalAudiosCompleted: totalAudiosCompleted,
-
       totalExamAttempts: totalExamAttempts,
-
       completedExams: completedExams,
-
       totalCorrectAnswers: totalCorrectAnswers,
-
       totalQuestions: totalQuestions,
-
       averageScore: averageScore,
-
       successRate: successRate,
     );
   }
@@ -511,12 +485,13 @@ class AdminUsersService {
   // LECTURES IN PROGRESS
   // ==========================================================================
 
-  int _calculateLecturesInProgress(List<Map<String, dynamic>> progress) {
+  int _calculateLecturesInProgress(
+    List<Map<String, dynamic>> progress,
+  ) {
     var result = 0;
 
     for (final item in progress) {
       final videoCompleted = _boolValue(item['video_completed']);
-
       final audioCompleted = _boolValue(item['audio_completed']);
 
       if (!videoCompleted && !audioCompleted) {
