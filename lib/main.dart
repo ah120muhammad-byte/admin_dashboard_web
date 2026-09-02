@@ -45,7 +45,7 @@ Future<void> main() async {
   runApp(AdminApp(isAdmin: isAdmin, settings: settings));
 }
 
-class AdminApp extends StatelessWidget {
+class AdminApp extends StatefulWidget {
   final bool isAdmin;
   final AdminSettings settings;
 
@@ -61,12 +61,53 @@ class AdminApp extends StatelessWidget {
   });
 
   @override
+  State<AdminApp> createState() => _AdminAppState();
+}
+
+class _AdminAppState extends State<AdminApp> {
+  late String _themeMode;
+
+  @override
+  void initState() {
+    super.initState();
+    _themeMode = widget.settings.themeMode;
+  }
+
+  Future<void> _setThemeMode(String mode) async {
+    if (mode != 'light' && mode != 'dark') return;
+
+    setState(() {
+      _themeMode = mode;
+    });
+
+    if (!widget.isAdmin || widget.settings.id.isEmpty) return;
+
+    try {
+      await AdminSettingsService().updateAdminSettings(
+        id: widget.settings.id,
+        themeMode: mode,
+        sidebarCompact: widget.settings.sidebarCompact,
+        analyticsEnabled: widget.settings.analyticsEnabled,
+      );
+    } catch (e) {
+      debugPrint('Unable to save theme mode: $e');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final mode = switch (settings.themeMode) {
+    final mode = switch (_themeMode) {
       'dark' => ThemeMode.dark,
       'light' => ThemeMode.light,
       _ => ThemeMode.system,
     };
+
+    final settings = AdminSettings(
+      id: widget.settings.id,
+      themeMode: _themeMode,
+      sidebarCompact: widget.settings.sidebarCompact,
+      analyticsEnabled: widget.settings.analyticsEnabled,
+    );
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -74,7 +115,12 @@ class AdminApp extends StatelessWidget {
       theme: AdminTheme.lightTheme,
       darkTheme: AdminTheme.darkTheme,
       themeMode: mode,
-      home: isAdmin ? AdminShell(settings: settings) : const AdminLoginScreen(),
+      home: widget.isAdmin
+          ? AdminShell(
+              settings: settings,
+              onThemeModeChanged: _setThemeMode,
+            )
+          : const AdminLoginScreen(),
     );
   }
 }
