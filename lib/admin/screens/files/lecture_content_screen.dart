@@ -48,14 +48,10 @@ class _LectureContentScreenState extends State<LectureContentScreen> {
   }
 
   List<LectureFileItem> _filesForLecture(String lectureId) {
-    final files = _files
-        .where((file) => file.lectureId == lectureId)
-        .toList(growable: true);
-
+    final files = _files.where((file) => file.lectureId == lectureId).toList();
     files.sort((a, b) {
       final order = a.displayOrder.compareTo(b.displayOrder);
       if (order != 0) return order;
-
       final aDate = a.createdAt;
       final bDate = b.createdAt;
       if (aDate == null && bDate == null) return 0;
@@ -63,7 +59,6 @@ class _LectureContentScreenState extends State<LectureContentScreen> {
       if (bDate == null) return -1;
       return aDate.compareTo(bDate);
     });
-
     return files;
   }
 
@@ -80,27 +75,24 @@ class _LectureContentScreenState extends State<LectureContentScreen> {
 
       final picked = result.files.single;
       final bytes = picked.bytes;
-
       if (bytes == null || bytes.isEmpty) {
         _showMessage('Unable to read the selected file.', error: true);
         return;
       }
 
-      final defaultOrder = _nextOrderForLecture(lectureId);
       final details = await showDialog<_FileDetails>(
         context: context,
         barrierDismissible: false,
         builder: (_) => _ContentDetailsDialog(
           fileType: fileType,
           fileName: picked.name,
-          defaultOrder: defaultOrder,
+          defaultOrder: _nextOrderForLecture(lectureId),
         ),
       );
 
       if (!mounted || details == null) return;
 
       _showBusyMessage('Uploading ${fileType.toUpperCase()}...');
-
       await _service.addLectureFile(
         lectureId: lectureId,
         title: details.title,
@@ -122,12 +114,9 @@ class _LectureContentScreenState extends State<LectureContentScreen> {
   int _nextOrderForLecture(String lectureId) {
     final files = _filesForLecture(lectureId);
     if (files.isEmpty) return 1;
-
     var maxOrder = 0;
     for (final file in files) {
-      if (file.displayOrder > maxOrder) {
-        maxOrder = file.displayOrder;
-      }
+      if (file.displayOrder > maxOrder) maxOrder = file.displayOrder;
     }
     return maxOrder + 1;
   }
@@ -153,12 +142,10 @@ class _LectureContentScreenState extends State<LectureContentScreen> {
         withData: true,
         allowMultiple: false,
       );
-
       if (!mounted || result == null || result.files.isEmpty) return;
 
       final picked = result.files.single;
       final bytes = picked.bytes;
-
       if (bytes == null || bytes.isEmpty) {
         _showMessage('Unable to read the selected file.', error: true);
         return;
@@ -170,8 +157,7 @@ class _LectureContentScreenState extends State<LectureContentScreen> {
         builder: (dialogContext) => AlertDialog(
           title: const Text('Replace Content'),
           content: Text(
-            'Replace "${file.title}" with:\n\n'
-            '${picked.name}\n\n'
+            'Replace "${file.title}" with:\n\n${picked.name}\n\n'
             'The same content record, title, type and display order will be kept.',
           ),
           actions: [
@@ -188,15 +174,12 @@ class _LectureContentScreenState extends State<LectureContentScreen> {
       );
 
       if (!mounted || confirmed != true) return;
-
       _showBusyMessage('Replacing ${file.fileType.toUpperCase()}...');
-
       await _service.replaceLectureFile(
         file: file,
         bytes: bytes,
         newFileName: picked.name,
       );
-
       if (!mounted) return;
       _showMessage('File replaced successfully.');
       await _refresh();
@@ -209,22 +192,11 @@ class _LectureContentScreenState extends State<LectureContentScreen> {
   Future<void> _openFile(LectureFileItem file) async {
     try {
       _showBusyMessage('Preparing ${file.fileType.toUpperCase()}...');
-
       final url = await _service.createFileUrl(file);
       final uri = Uri.tryParse(url);
-
-      if (uri == null) {
-        throw Exception('Invalid file URL.');
-      }
-
-      final launched = await launchUrl(
-        uri,
-        webOnlyWindowName: '_blank',
-      );
-
-      if (!launched) {
-        throw Exception('Unable to open file.');
-      }
+      if (uri == null) throw Exception('Invalid file URL.');
+      final launched = await launchUrl(uri, webOnlyWindowName: '_blank');
+      if (!launched) throw Exception('Unable to open file.');
     } catch (e) {
       if (!mounted) return;
       _showMessage('Unable to open file: $e', error: true);
@@ -237,15 +209,10 @@ class _LectureContentScreenState extends State<LectureContentScreen> {
       barrierDismissible: false,
       builder: (_) => _EditTitleDialog(initialTitle: file.title),
     );
-
     if (!mounted || title == null || title.trim().isEmpty) return;
 
     try {
-      await _service.updateFileTitle(
-        id: file.id,
-        title: title.trim(),
-      );
-
+      await _service.updateFileTitle(id: file.id, title: title.trim());
       if (!mounted) return;
       _showMessage('File title updated successfully.');
       await _refresh();
@@ -257,15 +224,9 @@ class _LectureContentScreenState extends State<LectureContentScreen> {
 
   Future<void> _toggleFileActive(LectureFileItem file) async {
     try {
-      await _service.setFileActive(
-        id: file.id,
-        value: !file.isActive,
-      );
-
+      await _service.setFileActive(id: file.id, value: !file.isActive);
       if (!mounted) return;
-      _showMessage(
-        file.isActive ? 'File deactivated.' : 'File activated.',
-      );
+      _showMessage(file.isActive ? 'File deactivated.' : 'File activated.');
       await _refresh();
     } catch (e) {
       if (!mounted) return;
@@ -290,7 +251,7 @@ class _LectureContentScreenState extends State<LectureContentScreen> {
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
             ),
             onPressed: () => Navigator.of(dialogContext).pop(true),
             child: const Text('Delete'),
@@ -303,7 +264,6 @@ class _LectureContentScreenState extends State<LectureContentScreen> {
 
     try {
       await _service.deleteLectureFile(file: file);
-
       if (!mounted) return;
       _showMessage('File deleted successfully.');
       await _refresh();
@@ -342,21 +302,18 @@ class _LectureContentScreenState extends State<LectureContentScreen> {
 
   void _showMessage(String message, {bool error = false}) {
     if (!mounted) return;
-
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
           content: Text(message),
-          backgroundColor:
-              error ? Theme.of(context).colorScheme.error : null,
+          backgroundColor: error ? Theme.of(context).colorScheme.error : null,
         ),
       );
   }
 
   void _showBusyMessage(String message) {
     if (!mounted) return;
-
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
@@ -379,74 +336,116 @@ class _LectureContentScreenState extends State<LectureContentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Lecture Content'),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh',
-            onPressed: _refresh,
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      body: FutureBuilder<void>(
-        future: _loadFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError) {
-            return _ErrorView(
-              error: snapshot.error.toString(),
-              onRetry: _refresh,
-            );
-          }
-
-          if (_lectures.isEmpty) {
-            return const Center(child: Text('No lectures found.'));
-          }
-
-          return RefreshIndicator(
-            onRefresh: _refresh,
-            child: ListView.builder(
-              padding: const EdgeInsets.all(20),
-              itemCount: _lectures.length,
-              itemBuilder: (context, index) {
-                final lecture = _lectures[index];
-                final files = _filesForLecture(lecture.id);
-
-                return _LectureSection(
-                  lecture: lecture,
-                  files: files,
-                  fileIcon: _fileIcon,
-                  fileColor: _fileColor,
-                  onAdd: (type) => _addContent(lecture.id, type),
-                  onOpen: _openFile,
-                  onReplace: _replaceFile,
-                  onEdit: _editFileTitle,
-                  onDelete: _deleteFile,
-                  onToggleActive: _toggleFileActive,
-                );
-              },
+    final theme = Theme.of(context);
+    return FutureBuilder<void>(
+      future: _loadFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return _ErrorView(error: snapshot.error.toString(), onRetry: _refresh);
+        }
+        if (_lectures.isEmpty) {
+          return const Center(child: Text('No lectures found.'));
+        }
+        final totalFiles = _files.length;
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Files & Downloads',
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Manage PDF, audio and video files inside each lecture.',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  _SummaryChip(label: 'Lectures', value: '${_lectures.length}'),
+                  const SizedBox(width: 8),
+                  _SummaryChip(label: 'Files', value: '$totalFiles'),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    tooltip: 'Refresh',
+                    onPressed: _refresh,
+                    icon: const Icon(Icons.refresh_rounded),
+                  ),
+                ],
+              ),
             ),
-          );
-        },
-      ),
+            const Divider(height: 1),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: _refresh,
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+                  itemCount: _lectures.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final lecture = _lectures[index];
+                    return _LectureSection(
+                      lecture: lecture,
+                      files: _filesForLecture(lecture.id),
+                      fileIcon: _fileIcon,
+                      fileColor: _fileColor,
+                      onAdd: (type) => _addContent(lecture.id, type),
+                      onOpen: _openFile,
+                      onReplace: _replaceFile,
+                      onEdit: _editFileTitle,
+                      onDelete: _deleteFile,
+                      onToggleActive: _toggleFileActive,
+                    );
+                  },
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
 
-class _FileDetails {
-  final String title;
-  final int displayOrder;
+class _SummaryChip extends StatelessWidget {
+  final String label;
+  final String value;
 
-  const _FileDetails({
-    required this.title,
-    required this.displayOrder,
-  });
+  const _SummaryChip({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: theme.textTheme.bodySmall),
+          const SizedBox(width: 6),
+          Text(value, style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
 }
 
 class _LectureSection extends StatefulWidget {
@@ -479,21 +478,23 @@ class _LectureSection extends StatefulWidget {
 }
 
 class _LectureSectionState extends State<_LectureSection> {
-  bool _expanded = true;
+  bool _expanded = false;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-
     return Card(
-      margin: const EdgeInsets.only(bottom: 14),
+      margin: EdgeInsets.zero,
+      elevation: 0,
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
           Material(
             color: scheme.surface,
             child: ListTile(
-              onTap: () => setState(() => _expanded = !_expanded),
+              onTap: () => setState(() {
+                _expanded = !_expanded;
+              }),
               leading: CircleAvatar(
                 child: Text('${widget.lecture.displayOrder}'),
               ),
@@ -501,14 +502,10 @@ class _LectureSectionState extends State<_LectureSection> {
                 widget.lecture.title,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w600,
-                  fontSize: 16,
-                ),
+                style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               subtitle: Text(
-                '${widget.files.length} '
-                '${widget.files.length == 1 ? 'file' : 'files'}',
+                '${widget.files.length} ${widget.files.length == 1 ? 'file' : 'files'}',
               ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -526,9 +523,7 @@ class _LectureSectionState extends State<_LectureSection> {
                     widget.lecture.isActive
                         ? Icons.check_circle_rounded
                         : Icons.cancel_rounded,
-                    color: widget.lecture.isActive
-                        ? scheme.primary
-                        : scheme.error,
+                    color: widget.lecture.isActive ? scheme.primary : scheme.error,
                   ),
                   const SizedBox(width: 8),
                   Icon(
@@ -543,221 +538,97 @@ class _LectureSectionState extends State<_LectureSection> {
           if (_expanded)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainerLowest,
-                border: Border(
-                  top: BorderSide(color: scheme.outlineVariant),
-                ),
-              ),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+              color: scheme.surfaceContainerLowest,
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _AddContentBar(onAdd: widget.onAdd),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () => widget.onAdd('pdf'),
+                        icon: const Icon(Icons.picture_as_pdf_rounded),
+                        label: const Text('Add PDF'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => widget.onAdd('audio'),
+                        icon: const Icon(Icons.audio_file_rounded),
+                        label: const Text('Add Audio'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => widget.onAdd('video'),
+                        icon: const Icon(Icons.video_file_rounded),
+                        label: const Text('Add Video'),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 10),
                   if (widget.files.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Text(
-                        'No content added to this lecture.',
-                        style: TextStyle(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
+                    Text(
+                      'No files uploaded for this lecture.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
                     )
                   else
                     ...widget.files.map(
-                      (file) => _FileTile(
-                        file: file,
-                        icon: widget.fileIcon(file.fileType),
-                        iconColor:
-                            widget.fileColor(context, file.fileType),
-                        onOpen: () => widget.onOpen(file),
-                        onReplace: () => widget.onReplace(file),
-                        onEdit: () => widget.onEdit(file),
-                        onDelete: () => widget.onDelete(file),
-                        onToggleActive: () =>
-                            widget.onToggleActive(file),
+                      (file) => Card(
+                        elevation: 0,
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: Icon(
+                            widget.fileIcon(file.fileType),
+                            color: widget.fileColor(context, file.fileType),
+                          ),
+                          title: Text(
+                            file.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(
+                            '${file.fileType.toUpperCase()} • ${file.isActive ? 'Active' : 'Inactive'}',
+                          ),
+                          onTap: () => widget.onOpen(file),
+                          trailing: PopupMenuButton<String>(
+                            onSelected: (value) {
+                              switch (value) {
+                                case 'open':
+                                  widget.onOpen(file);
+                                  break;
+                                case 'replace':
+                                  widget.onReplace(file);
+                                  break;
+                                case 'edit':
+                                  widget.onEdit(file);
+                                  break;
+                                case 'active':
+                                  widget.onToggleActive(file);
+                                  break;
+                                case 'delete':
+                                  widget.onDelete(file);
+                                  break;
+                              }
+                            },
+                            itemBuilder: (_) => [
+                              const PopupMenuItem(value: 'open', child: Text('Open')),
+                              const PopupMenuItem(value: 'replace', child: Text('Replace')),
+                              const PopupMenuItem(value: 'edit', child: Text('Edit Title')),
+                              PopupMenuItem(
+                                value: 'active',
+                                child: Text(file.isActive ? 'Deactivate' : 'Activate'),
+                              ),
+                              const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
                 ],
               ),
             ),
         ],
-      ),
-    );
-  }
-}
-
-class _AddContentBar extends StatelessWidget {
-  final Future<void> Function(String) onAdd;
-
-  const _AddContentBar({required this.onAdd});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Text(
-              'Add content:',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-            ),
-            OutlinedButton.icon(
-              onPressed: () => onAdd('pdf'),
-              icon: const Icon(Icons.picture_as_pdf_rounded),
-              label: const Text('PDF'),
-            ),
-            OutlinedButton.icon(
-              onPressed: () => onAdd('audio'),
-              icon: const Icon(Icons.audio_file_rounded),
-              label: const Text('Audio'),
-            ),
-            OutlinedButton.icon(
-              onPressed: () => onAdd('video'),
-              icon: const Icon(Icons.video_file_rounded),
-              label: const Text('Video'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _FileTile extends StatelessWidget {
-  final LectureFileItem file;
-  final IconData icon;
-  final Color iconColor;
-  final VoidCallback onOpen;
-  final VoidCallback onReplace;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-  final VoidCallback onToggleActive;
-
-  const _FileTile({
-    required this.file,
-    required this.icon,
-    required this.iconColor,
-    required this.onOpen,
-    required this.onReplace,
-    required this.onEdit,
-    required this.onDelete,
-    required this.onToggleActive,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        color: file.isActive
-            ? scheme.surface
-            : scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
-        clipBehavior: Clip.antiAlias,
-        child: ListTile(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          leading: Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: iconColor),
-          ),
-          title: Row(
-            children: [
-              Flexible(
-                child: Text(
-                  file.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 3,
-                ),
-                decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  file.fileType.toUpperCase(),
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    color: iconColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          subtitle: Text(
-            'Order ${file.displayOrder}',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: scheme.onSurfaceVariant,
-              fontSize: 12,
-            ),
-          ),
-          trailing: Wrap(
-            spacing: 2,
-            children: [
-              IconButton(
-                tooltip: 'Open',
-                onPressed: onOpen,
-                icon: const Icon(Icons.open_in_new_rounded),
-              ),
-              IconButton(
-                tooltip: 'Replace',
-                onPressed: onReplace,
-                icon: const Icon(Icons.swap_horiz_rounded),
-              ),
-              IconButton(
-                tooltip: file.isActive ? 'Deactivate' : 'Activate',
-                onPressed: onToggleActive,
-                icon: Icon(
-                  file.isActive
-                      ? Icons.toggle_on_rounded
-                      : Icons.toggle_off_rounded,
-                ),
-              ),
-              IconButton(
-                tooltip: 'Edit title',
-                onPressed: onEdit,
-                icon: const Icon(Icons.edit_rounded),
-              ),
-              IconButton(
-                tooltip: 'Delete',
-                onPressed: onDelete,
-                icon: Icon(
-                  Icons.delete_outline_rounded,
-                  color: scheme.error,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -781,20 +652,15 @@ class _ContentDetailsDialog extends StatefulWidget {
 class _ContentDetailsDialogState extends State<_ContentDetailsDialog> {
   late final TextEditingController _titleController;
   late final TextEditingController _orderController;
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final _formKey = GlobalKey<FormState>();
 
   @override
   void initState() {
     super.initState();
     _titleController = TextEditingController(
-      text: widget.fileName.replaceFirst(
-        RegExp(r'\.[^.]+$'),
-        '',
-      ),
+      text: widget.fileName.replaceFirst(RegExp(r'\.[^.]+$'), ''),
     );
-    _orderController = TextEditingController(
-      text: widget.defaultOrder.toString(),
-    );
+    _orderController = TextEditingController(text: '${widget.defaultOrder}');
   }
 
   @override
@@ -804,25 +670,10 @@ class _ContentDetailsDialogState extends State<_ContentDetailsDialog> {
     super.dispose();
   }
 
-  IconData _icon() {
-    switch (widget.fileType.toLowerCase()) {
-      case 'pdf':
-        return Icons.picture_as_pdf_rounded;
-      case 'audio':
-        return Icons.audio_file_rounded;
-      case 'video':
-        return Icons.video_file_rounded;
-      default:
-        return Icons.insert_drive_file_rounded;
-    }
-  }
-
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
-
     final order = int.tryParse(_orderController.text.trim());
-    if (order == null || order < 1) return;
-
+    if (order == null || order < 0) return;
     Navigator.of(context).pop(
       _FileDetails(
         title: _titleController.text.trim(),
@@ -833,18 +684,10 @@ class _ContentDetailsDialogState extends State<_ContentDetailsDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-
     return AlertDialog(
-      title: Row(
-        children: [
-          Icon(_icon()),
-          const SizedBox(width: 10),
-          Text('Add ${widget.fileType.toUpperCase()}'),
-        ],
-      ),
+      title: Text('Add ${widget.fileType.toUpperCase()}'),
       content: SizedBox(
-        width: size.width >= 700 ? 440 : size.width * 0.82,
+        width: 440,
         child: Form(
           key: _formKey,
           child: Column(
@@ -853,44 +696,23 @@ class _ContentDetailsDialogState extends State<_ContentDetailsDialog> {
               TextFormField(
                 controller: _titleController,
                 autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Content Title',
-                  prefixIcon: Icon(Icons.title_rounded),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Enter content title';
-                  }
-                  return null;
-                },
+                decoration: const InputDecoration(labelText: 'File Title'),
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Enter file title'
+                    : null,
               ),
               const SizedBox(height: 14),
               TextFormField(
                 controller: _orderController,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Display Order',
-                  prefixIcon:
-                      Icon(Icons.format_list_numbered_rounded),
-                ),
-                validator: (value) {
-                  final order = int.tryParse(value?.trim() ?? '');
-                  if (order == null || order < 1) {
-                    return 'Enter a valid positive number';
-                  }
-                  return null;
-                },
+                decoration: const InputDecoration(labelText: 'Display Order'),
+                validator: (value) => int.tryParse(value?.trim() ?? '') == null
+                    ? 'Enter a valid number'
+                    : null,
               ),
               const SizedBox(height: 14),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(10),
-                ),
+              Align(
+                alignment: Alignment.centerLeft,
                 child: Text(
                   widget.fileName,
                   maxLines: 2,
@@ -916,6 +738,13 @@ class _ContentDetailsDialogState extends State<_ContentDetailsDialog> {
   }
 }
 
+class _FileDetails {
+  final String title;
+  final int displayOrder;
+
+  const _FileDetails({required this.title, required this.displayOrder});
+}
+
 class _EditTitleDialog extends StatefulWidget {
   final String initialTitle;
 
@@ -927,7 +756,6 @@ class _EditTitleDialog extends StatefulWidget {
 
 class _EditTitleDialogState extends State<_EditTitleDialog> {
   late final TextEditingController _controller;
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   @override
   void initState() {
@@ -941,36 +769,13 @@ class _EditTitleDialogState extends State<_EditTitleDialog> {
     super.dispose();
   }
 
-  void _submit() {
-    if (!_formKey.currentState!.validate()) return;
-    Navigator.of(context).pop(_controller.text.trim());
-  }
-
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-
     return AlertDialog(
       title: const Text('Edit File Title'),
-      content: SizedBox(
-        width: size.width >= 700 ? 440 : size.width * 0.82,
-        child: Form(
-          key: _formKey,
-          child: TextFormField(
-            controller: _controller,
-            autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'Title',
-              prefixIcon: Icon(Icons.title_rounded),
-            ),
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'Enter a title';
-              }
-              return null;
-            },
-          ),
-        ),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
       ),
       actions: [
         TextButton(
@@ -978,7 +783,7 @@ class _EditTitleDialogState extends State<_EditTitleDialog> {
           child: const Text('Cancel'),
         ),
         FilledButton(
-          onPressed: _submit,
+          onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
           child: const Text('Save'),
         ),
       ],
@@ -990,41 +795,21 @@ class _ErrorView extends StatelessWidget {
   final String error;
   final Future<void> Function() onRetry;
 
-  const _ErrorView({
-    required this.error,
-    required this.onRetry,
-  });
+  const _ErrorView({required this.error, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.cloud_off_rounded,
-              size: 56,
-              color: scheme.error,
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Unable to load lecture content',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            SelectableText(
-              error,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
+            Icon(Icons.cloud_off_rounded, size: 52, color: scheme.error),
+            const SizedBox(height: 12),
+            const Text('Unable to load files.'),
+            const SizedBox(height: 12),
             FilledButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh_rounded),
