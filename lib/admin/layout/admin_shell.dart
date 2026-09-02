@@ -11,11 +11,13 @@ import 'package:admin_dashboard_web/admin/screens/levels/academic_levels_screen.
 import '../../admin/screens/modules/modules_screen.dart';
 import '../screens/exams/exams_screen.dart';
 import '../screens/admin_login_screen.dart';
+import '../screens/users/user_analytics_charts.dart';
 import 'admin_sidebar.dart';
 import 'admin_top_bar.dart';
 
 class AdminShell extends StatefulWidget {
   const AdminShell({super.key});
+
   @override
   State<AdminShell> createState() => _AdminShellState();
 }
@@ -25,7 +27,7 @@ class _AdminShellState extends State<AdminShell> {
 
   final List<Widget> _pages = const [
     DashboardScreen(),
-    UsersManagementScreen(),
+    UsersAnalyticsDashboard(),
     AcademicLevelsScreen(),
     ModulesScreen(),
     LecturesScreen(),
@@ -37,8 +39,16 @@ class _AdminShellState extends State<AdminShell> {
   ];
 
   final List<String> _titles = const [
-    'Dashboard', 'Users', 'Academic Levels', 'Modules', 'Lectures',
-    'Files / Downloads', 'Notifications', 'Settings', 'Exams', 'Exam Attempts',
+    'Dashboard',
+    'Users',
+    'Academic Levels',
+    'Modules',
+    'Lectures',
+    'Files / Downloads',
+    'Notifications',
+    'Settings',
+    'Exams',
+    'Exam Attempts',
   ];
 
   Future<void> _logout() async {
