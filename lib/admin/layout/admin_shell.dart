@@ -37,6 +37,7 @@ class AdminShell extends StatefulWidget {
 
 class _AdminShellState extends State<AdminShell> {
   int _selectedIndex = 0;
+  late String _themeMode;
 
   final List<Widget> _pages = const [
     DashboardScreen(),
@@ -66,11 +67,51 @@ class _AdminShellState extends State<AdminShell> {
     'Student Performance',
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _themeMode = widget.settings.themeMode;
+  }
+
+  void _setThemeMode(String mode) {
+    if (mode != 'light' && mode != 'dark' && mode != 'system') {
+      return;
+    }
+    if (_themeMode == mode) {
+      return;
+    }
+
+    setState(() {
+      _themeMode = mode;
+    });
+
+    widget.onThemeModeChanged?.call(mode);
+
+    final id = widget.settings.id;
+    if (id.isEmpty) {
+      return;
+    }
+
+    AdminSettingsService().updateAdminSettings(
+      id: id,
+      themeMode: mode,
+      sidebarCompact: widget.settings.sidebarCompact,
+      analyticsEnabled: widget.settings.analyticsEnabled,
+    ).catchError((_) {});
+  }
+
+  void _toggleTheme() {
+    final brightness = Theme.of(context).brightness;
+    _setThemeMode(brightness == Brightness.dark ? 'light' : 'dark');
+  }
+
   Future<void> _logout() async {
     try {
       await Supabase.instance.client.auth.signOut();
     } catch (_) {}
+
     if (!mounted) return;
+
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const AdminLoginScreen()),
       (_) => false,
@@ -79,15 +120,20 @@ class _AdminShellState extends State<AdminShell> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final effectiveSettings = AdminSettings(
+      id: widget.settings.id,
+      themeMode: _themeMode,
+      sidebarCompact: widget.settings.sidebarCompact,
+      analyticsEnabled: widget.settings.analyticsEnabled,
+    );
 
     return Scaffold(
       body: Row(
         children: [
           AdminSidebar(
             selectedIndex: _selectedIndex,
-            compact: widget.settings.sidebarCompact,
-            analyticsEnabled: widget.settings.analyticsEnabled,
+            compact: effectiveSettings.sidebarCompact,
+            analyticsEnabled: effectiveSettings.analyticsEnabled,
             onItemSelected: (index) => setState(() {
               _selectedIndex = index;
             }),
@@ -98,12 +144,8 @@ class _AdminShellState extends State<AdminShell> {
               children: [
                 AdminTopBar(
                   title: _titles[_selectedIndex],
-                  isDark: isDark,
-                  onThemeToggle: widget.onThemeModeChanged == null
-                      ? null
-                      : () => widget.onThemeModeChanged!(
-                            isDark ? 'light' : 'dark',
-                          ),
+                  isDarkMode: Theme.of(context).brightness == Brightness.dark,
+                  onToggleTheme: _toggleTheme,
                 ),
                 Expanded(
                   child: IndexedStack(
