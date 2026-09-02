@@ -18,14 +18,94 @@ import 'admin_top_bar.dart';
 
 class AdminShell extends StatefulWidget {
   final AdminSettings settings;
-  const AdminShell({super.key, required this.settings});
-  @override State<AdminShell> createState()=>_AdminShellState();
+
+  const AdminShell({
+    super.key,
+    this.settings = const AdminSettings(
+      id: '',
+      themeMode: 'system',
+      sidebarCompact: false,
+      analyticsEnabled: true,
+    ),
+  });
+
+  @override
+  State<AdminShell> createState() => _AdminShellState();
 }
 
-class _AdminShellState extends State<AdminShell>{
-  int _selectedIndex=0;
-  final List<Widget> _pages=const[DashboardScreen(),UsersAnalyticsDashboard(),AcademicLevelsScreen(),ModulesScreen(),ModuleContentPickerScreen(),ModuleFilesPickerScreen(),NotificationManagementScreenV2(),SettingsScreenV2(),ExamsManagementScreen(),ExamAttemptsScreen(),StudentExamPerformanceScreen()];
-  final List<String> _titles=const['Dashboard','Users','Academic Levels','Modules','Lectures & Content','Files / Downloads','Notifications','Settings','Exams','Exam Attempts','Student Performance'];
-  Future<void> _logout()async{try{await Supabase.instance.client.auth.signOut();}catch(_){}if(!mounted)return;Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute(builder:(_)=>const AdminLoginScreen()),(_)=>false);}
-  @override Widget build(BuildContext context){return Scaffold(body:Row(children:[AdminSidebar(selectedIndex:_selectedIndex,compact:widget.settings.sidebarCompact,analyticsEnabled:widget.settings.analyticsEnabled,onItemSelected:(i)=>setState(()=>_selectedIndex=i),onLogout:_logout),Expanded(child:Column(children:[AdminTopBar(title:_titles[_selectedIndex]),Expanded(child:IndexedStack(index:_selectedIndex,children:_pages))]))]));}
+class _AdminShellState extends State<AdminShell> {
+  int _selectedIndex = 0;
+
+  final List<Widget> _pages = const [
+    DashboardScreen(),
+    UsersAnalyticsDashboard(),
+    AcademicLevelsScreen(),
+    ModulesScreen(),
+    ModuleContentPickerScreen(),
+    ModuleFilesPickerScreen(),
+    NotificationManagementScreenV2(),
+    SettingsScreenV2(),
+    ExamsManagementScreen(),
+    ExamAttemptsScreen(),
+    StudentExamPerformanceScreen(),
+  ];
+
+  final List<String> _titles = const [
+    'Dashboard',
+    'Users',
+    'Academic Levels',
+    'Modules',
+    'Lectures & Content',
+    'Files / Downloads',
+    'Notifications',
+    'Settings',
+    'Exams',
+    'Exam Attempts',
+    'Student Performance',
+  ];
+
+  Future<void> _logout() async {
+    try {
+      await Supabase.instance.client.auth.signOut();
+    } catch (_) {}
+
+    if (!mounted) return;
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const AdminLoginScreen()),
+      (_) => false,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Row(
+        children: [
+          AdminSidebar(
+            selectedIndex: _selectedIndex,
+            compact: widget.settings.sidebarCompact,
+            analyticsEnabled: widget.settings.analyticsEnabled,
+            onItemSelected: (index) => setState(() {
+              _selectedIndex = index;
+            }),
+            onLogout: _logout,
+          ),
+          Expanded(
+            child: Column(
+              children: [
+                AdminTopBar(title: _titles[_selectedIndex]),
+                Expanded(
+                  child: IndexedStack(
+                    index: _selectedIndex,
+                    children: _pages,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
