@@ -3,11 +3,15 @@ import 'package:flutter/material.dart';
 class AdminTopBar extends StatelessWidget {
   final String title;
   final String? subtitle;
+  final bool isDark;
+  final VoidCallback? onThemeToggle;
 
   const AdminTopBar({
     super.key,
     required this.title,
     this.subtitle,
+    this.isDark = false,
+    this.onThemeToggle,
   });
 
   @override
@@ -49,6 +53,14 @@ class AdminTopBar extends StatelessWidget {
               ],
             ),
           ),
+          IconButton(
+            tooltip: isDark ? 'Switch to light theme' : 'Switch to dark theme',
+            onPressed: onThemeToggle,
+            icon: Icon(
+              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+            ),
+          ),
+          const SizedBox(width: 4),
           IconButton(
             tooltip: 'Notifications',
             onPressed: () {},
