@@ -139,7 +139,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                           child: Image.asset(
                             'images/icon-1.png',
                             fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => Icon(
+                            errorBuilder: (_, _, _) => Icon(
                               Icons.school_rounded,
                               color: colorScheme.primary,
                               size: 44,
@@ -149,17 +149,21 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    Text(
-                      'MediData Admin',
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
+                    Center(
+                      child: Text(
+                        'MediData Admin',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      'Sign in to the admin dashboard',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurface.withValues(alpha: 0.60),
+                    Center(
+                      child: Text(
+                        'Sign in to the admin dashboard',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurface.withValues(alpha: 0.60),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 28),
