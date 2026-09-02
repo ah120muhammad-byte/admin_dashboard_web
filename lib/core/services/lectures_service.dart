@@ -142,7 +142,28 @@ class LecturesService {
         .select('id')
         .single();
 
-    return response['id'] as String;
+    final lectureId = response['id'] as String;
+
+    // The lecture is already saved successfully. Notification delivery is
+    // best-effort so a push failure never rolls back lecture creation.
+    try {
+      final notificationTitle = 'New Lecture Available';
+      final notificationBody = 'A new lecture "$title" is now available.';
+
+      await _supabase.functions.invoke(
+        'send-broadcast-notification',
+        body: {
+          'title': notificationTitle,
+          'body': notificationBody,
+          'type': 'new_lecture',
+          'lectureId': lectureId,
+        },
+      );
+    } catch (_) {
+      // Keep lecture creation successful even when notification delivery fails.
+    }
+
+    return lectureId;
   }
 
   Future<void> addLectureContent({
