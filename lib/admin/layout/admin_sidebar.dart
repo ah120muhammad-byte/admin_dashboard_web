@@ -197,7 +197,7 @@ class _LogoMark extends StatelessWidget {
         child: Image.asset(
           'images/icon-1.png',
           fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) => Icon(
+          errorBuilder: (_, _, _) => Icon(
             Icons.medical_services_rounded,
             color: AdminTheme.primary,
             size: size * .55,
