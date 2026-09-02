@@ -41,7 +41,9 @@ class _ContentDeletionScreenState extends State<ContentDeletionScreen> {
   Future<void> _refresh() async {
     final future = _load();
     if (!mounted) return;
-    setState(() => _future = future);
+    setState(() {
+      _future = future;
+    });
     await future;
   }
 
@@ -82,45 +84,51 @@ class _ContentDeletionScreenState extends State<ContentDeletionScreen> {
 
   Future<void> _deleteLevel(AcademicLevel level, _Data data) async {
     final count = data.modules.where((m) => m.academicLevelId == level.id).length;
-    if (!await _confirm(
+    final confirmed = await _confirm(
       'Delete Academic Level?',
       'Delete "${level.name}" permanently? It currently contains $count module(s).',
-    )) return;
+    );
+    if (!confirmed || !mounted) return;
+
     try {
       await _levels.deleteLevel(level.id);
       await _refresh();
-      _message('Academic level deleted.');
+      if (mounted) _message('Academic level deleted.');
     } catch (e) {
-      _message('Delete failed: $e', error: true);
+      if (mounted) _message('Delete failed: $e', error: true);
     }
   }
 
   Future<void> _deleteModule(AdminModule module, _Data data) async {
     final count = data.lectures.where((l) => l.moduleId == module.id).length;
-    if (!await _confirm(
+    final confirmed = await _confirm(
       'Delete Module?',
       'Delete "${module.name}" permanently? It currently contains $count lecture(s).',
-    )) return;
+    );
+    if (!confirmed || !mounted) return;
+
     try {
       await _modules.deleteModule(module.id);
       await _refresh();
-      _message('Module deleted.');
+      if (mounted) _message('Module deleted.');
     } catch (e) {
-      _message('Delete failed: $e', error: true);
+      if (mounted) _message('Delete failed: $e', error: true);
     }
   }
 
   Future<void> _deleteLecture(AdminLecture lecture) async {
-    if (!await _confirm(
+    final confirmed = await _confirm(
       'Delete Lecture?',
       'Delete "${lecture.title}" permanently and remove its uploaded files from storage?',
-    )) return;
+    );
+    if (!confirmed || !mounted) return;
+
     try {
       await _lectures.deleteLecture(lecture.id);
       await _refresh();
-      _message('Lecture deleted.');
+      if (mounted) _message('Lecture deleted.');
     } catch (e) {
-      _message('Delete failed: $e', error: true);
+      if (mounted) _message('Delete failed: $e', error: true);
     }
   }
 
@@ -198,7 +206,11 @@ class _ContentDeletionScreenState extends State<ContentDeletionScreen> {
                       ),
                     ],
                     selected: {_tab},
-                    onSelectionChanged: (value) => setState(() => _tab = value.first),
+                    onSelectionChanged: (value) {
+                      setState(() {
+                        _tab = value.first;
+                      });
+                    },
                   ),
                   const SizedBox(height: 12),
                   TextField(
@@ -206,7 +218,11 @@ class _ContentDeletionScreenState extends State<ContentDeletionScreen> {
                       hintText: 'Search...',
                       prefixIcon: Icon(Icons.search_rounded),
                     ),
-                    onChanged: (value) => setState(() => _search = value.trim().toLowerCase()),
+                    onChanged: (value) {
+                      setState(() {
+                        _search = value.trim().toLowerCase();
+                      });
+                    },
                   ),
                 ],
               ),
@@ -221,7 +237,9 @@ class _ContentDeletionScreenState extends State<ContentDeletionScreen> {
 
   Widget _buildList(_Data data) {
     if (_tab == 0) {
-      final items = data.levels.where((x) => _search.isEmpty || x.name.toLowerCase().contains(_search)).toList();
+      final items = data.levels
+          .where((x) => _search.isEmpty || x.name.toLowerCase().contains(_search))
+          .toList();
       return _itemsList(items, (level) {
         final count = data.modules.where((m) => m.academicLevelId == level.id).length;
         return ListTile(
@@ -232,39 +250,54 @@ class _ContentDeletionScreenState extends State<ContentDeletionScreen> {
         );
       });
     }
+
     if (_tab == 1) {
-      final items = data.modules.where((x) => _search.isEmpty || x.name.toLowerCase().contains(_search)).toList();
+      final items = data.modules
+          .where((x) => _search.isEmpty || x.name.toLowerCase().contains(_search))
+          .toList();
       return _itemsList(items, (module) {
         final count = data.lectures.where((l) => l.moduleId == module.id).length;
-        AdminLevelName? level;
-        for (final item in data.levels) {
-          if (item.id == module.academicLevelId) {
-            level = AdminLevelName(item.name);
+        String levelName = 'Unknown Level';
+        for (final level in data.levels) {
+          if (level.id == module.academicLevelId) {
+            levelName = level.name;
             break;
           }
         }
         return ListTile(
           leading: const CircleAvatar(child: Icon(Icons.menu_book_outlined)),
           title: Text(module.name),
-          subtitle: Text('${level?.name ?? 'Unknown Level'} • $count lecture(s)'),
+          subtitle: Text('$levelName • $count lecture(s)'),
           trailing: _deleteButton(() => _deleteModule(module, data)),
         );
       });
     }
-    final items = data.lectures.where((x) => _search.isEmpty || x.title.toLowerCase().contains(_search)).toList();
-    return _itemsList(items, (lecture) => ListTile(
-      leading: const CircleAvatar(child: Icon(Icons.video_library_outlined)),
-      title: Text(lecture.title),
-      subtitle: Text('${lecture.isPublished ? 'Published' : 'Draft'} • ${lecture.isActive ? 'Active' : 'Inactive'}'),
-      trailing: _deleteButton(() => _deleteLecture(lecture)),
-    ));
+
+    final items = data.lectures
+        .where((x) => _search.isEmpty || x.title.toLowerCase().contains(_search))
+        .toList();
+    return _itemsList(items, (lecture) {
+      return ListTile(
+        leading: const CircleAvatar(child: Icon(Icons.video_library_outlined)),
+        title: Text(lecture.title),
+        subtitle: Text(
+          '${lecture.isPublished ? 'Published' : 'Draft'} • ${lecture.isActive ? 'Active' : 'Inactive'}',
+        ),
+        trailing: _deleteButton(() => _deleteLecture(lecture)),
+      );
+    });
   }
 
-  Widget _deleteButton(VoidCallback onPressed) => IconButton(
-    tooltip: 'Delete permanently',
-    onPressed: onPressed,
-    icon: Icon(Icons.delete_outline_rounded, color: Theme.of(context).colorScheme.error),
-  );
+  Widget _deleteButton(VoidCallback onPressed) {
+    return IconButton(
+      tooltip: 'Delete permanently',
+      onPressed: onPressed,
+      icon: Icon(
+        Icons.delete_outline_rounded,
+        color: Theme.of(context).colorScheme.error,
+      ),
+    );
+  }
 
   Widget _itemsList<T>(List<T> items, Widget Function(T item) builder) {
     if (items.isEmpty) return const Center(child: Text('No items found.'));
@@ -272,19 +305,22 @@ class _ContentDeletionScreenState extends State<ContentDeletionScreen> {
       padding: const EdgeInsets.fromLTRB(24, 18, 24, 32),
       itemCount: items.length,
       separatorBuilder: (_, _) => const SizedBox(height: 10),
-      itemBuilder: (_, index) => Card(elevation: 0, child: builder(items[index])),
+      itemBuilder: (_, index) => Card(
+        elevation: 0,
+        child: builder(items[index]),
+      ),
     );
   }
-}
-
-class AdminLevelName {
-  final String name;
-  const AdminLevelName(this.name);
 }
 
 class _Data {
   final List<AcademicLevel> levels;
   final List<AdminModule> modules;
   final List<AdminLecture> lectures;
-  const _Data({required this.levels, required this.modules, required this.lectures});
+
+  const _Data({
+    required this.levels,
+    required this.modules,
+    required this.lectures,
+  });
 }
