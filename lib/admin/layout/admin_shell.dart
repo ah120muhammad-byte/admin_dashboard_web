@@ -2,7 +2,7 @@ import 'package:admin_dashboard_web/admin/screens/exams/exam_attempts_screen.dar
 import 'package:admin_dashboard_web/admin/screens/exams/exams_management_screen.dart';
 import 'package:admin_dashboard_web/admin/screens/exams/student_exam_performance_screen.dart';
 import 'package:admin_dashboard_web/admin/screens/files/module_files_picker_screen.dart';
-import 'package:admin_dashboard_web/admin/screens/notifications/notification_management_screen.dart';
+import 'package:admin_dashboard_web/admin/screens/notifications/notification_management_screen_v2.dart';
 import 'package:admin_dashboard_web/admin/screens/settings/settings_screen.dart';
 import 'package:admin_dashboard_web/admin/screens/lectures/module_content_picker_screen.dart';
 import 'package:flutter/material.dart';
@@ -33,7 +33,7 @@ class _AdminShellState extends State<AdminShell> {
     ModulesScreen(),
     ModuleContentPickerScreen(),
     ModuleFilesPickerScreen(),
-    NotificationManagementScreen(),
+    NotificationManagementScreenV2(),
     SettingsScreen(),
     ExamsManagementScreen(),
     ExamAttemptsScreen(),
@@ -74,7 +74,9 @@ class _AdminShellState extends State<AdminShell> {
         children: [
           AdminSidebar(
             selectedIndex: _selectedIndex,
-            onItemSelected: (index) => setState(() => _selectedIndex = index),
+            onItemSelected: (index) => setState(() {
+              _selectedIndex = index;
+            }),
             onLogout: _logout,
           ),
           Expanded(
