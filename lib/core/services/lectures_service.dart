@@ -85,25 +85,17 @@ class LectureContentInput {
 class LecturesService {
   final SupabaseClient _supabase;
 
-  LecturesService({
-    SupabaseClient? supabase,
-  }) : _supabase = supabase ?? Supabase.instance.client;
+  LecturesService({SupabaseClient? supabase})
+      : _supabase = supabase ?? Supabase.instance.client;
 
   Future<List<AdminLecture>> getLectures() async {
-    final response = await _supabase
-        .from('lectures')
-        .select(
-          'id, module_id, title, description, display_order, '
-          'is_published, is_active, created_at, updated_at, published_at',
-        )
-        .order('display_order', ascending: true);
+    final response = await _supabase.from('lectures').select(
+          'id, module_id, title, description, display_order, is_published, '
+          'is_active, created_at, updated_at, published_at',
+        ).order('display_order', ascending: true);
 
     return (response as List)
-        .map(
-          (item) => AdminLecture.fromMap(
-            Map<String, dynamic>.from(item),
-          ),
-        )
+        .map((item) => AdminLecture.fromMap(Map<String, dynamic>.from(item)))
         .toList();
   }
 
@@ -115,11 +107,7 @@ class LecturesService {
         .order('display_order', ascending: true);
 
     return (response as List)
-        .map(
-          (item) => LectureModule.fromMap(
-            Map<String, dynamic>.from(item),
-          ),
-        )
+        .map((item) => LectureModule.fromMap(Map<String, dynamic>.from(item)))
         .toList();
   }
 
@@ -129,39 +117,28 @@ class LecturesService {
     String? description,
     required int displayOrder,
   }) async {
-    final response = await _supabase
-        .from('lectures')
-        .insert({
-          'module_id': moduleId,
-          'title': title,
-          'description': description,
-          'display_order': displayOrder,
-          'is_published': false,
-          'is_active': true,
-        })
-        .select('id')
-        .single();
+    final response = await _supabase.from('lectures').insert({
+      'module_id': moduleId,
+      'title': title,
+      'description': description,
+      'display_order': displayOrder,
+      'is_published': false,
+      'is_active': true,
+    }).select('id').single();
 
     final lectureId = response['id'] as String;
 
-    // The lecture is already saved successfully. Notification delivery is
-    // best-effort so a push failure never rolls back lecture creation.
     try {
-      final notificationTitle = 'New Lecture Available';
-      final notificationBody = 'A new lecture "$title" is now available.';
-
       await _supabase.functions.invoke(
         'send-broadcast-notification',
         body: {
-          'title': notificationTitle,
-          'body': notificationBody,
+          'title': 'New Lecture Available',
+          'body': 'A new lecture "$title" is now available.',
           'type': 'new_lecture',
           'lectureId': lectureId,
         },
       );
-    } catch (_) {
-      // Keep lecture creation successful even when notification delivery fails.
-    }
+    } catch (_) {}
 
     return lectureId;
   }
@@ -229,7 +206,6 @@ class LecturesService {
     if (response.isNotEmpty) {
       return ((response.first['display_order'] as num?)?.toInt() ?? 0) + 1;
     }
-
     return 1;
   }
 
@@ -269,9 +245,7 @@ class LecturesService {
     if (oldPath.isNotEmpty && oldPath != newPath) {
       try {
         await _supabase.storage.from(bucket).remove([oldPath]);
-      } catch (_) {
-        // The DB already points to the new file. Keep the successful replace.
-      }
+      } catch (_) {}
     }
   }
 
@@ -282,38 +256,56 @@ class LecturesService {
     String? description,
     required int displayOrder,
   }) async {
-    await _supabase
-        .from('lectures')
-        .update({
-          'module_id': moduleId,
-          'title': title,
-          'description': description,
-          'display_order': displayOrder,
-        })
-        .eq('id', id);
+    await _supabase.from('lectures').update({
+      'module_id': moduleId,
+      'title': title,
+      'description': description,
+      'display_order': displayOrder,
+    }).eq('id', id);
   }
 
   Future<void> setActive({
     required String id,
     required bool value,
   }) async {
-    await _supabase
-        .from('lectures')
-        .update({'is_active': value})
-        .eq('id', id);
+    await _supabase.from('lectures').update({'is_active': value}).eq('id', id);
   }
 
   Future<void> setPublished({
     required String id,
     required bool value,
   }) async {
-    await _supabase
-        .from('lectures')
-        .update({
-          'is_published': value,
-          'published_at': value ? DateTime.now().toIso8601String() : null,
-        })
-        .eq('id', id);
+    await _supabase.from('lectures').update({
+      'is_published': value,
+      'published_at': value ? DateTime.now().toIso8601String() : null,
+    }).eq('id', id);
+  }
+
+  Future<void> deleteLecture(String id) async {
+    final files = await _supabase
+        .from('lecture_files')
+        .select('file_type, file_url')
+        .eq('lecture_id', id);
+
+    final grouped = <String, List<String>>{};
+    for (final raw in files as List) {
+      final type = raw['file_type'] as String? ?? '';
+      final url = raw['file_url'] as String? ?? '';
+      if (type.isEmpty || url.isEmpty) continue;
+      final bucket = _bucketForType(type);
+      final path = _extractStoragePath(url, bucket);
+      if (path.isNotEmpty) {
+        grouped.putIfAbsent(bucket, () => <String>[]).add(path);
+      }
+    }
+
+    for (final entry in grouped.entries) {
+      try {
+        await _supabase.storage.from(entry.key).remove(entry.value);
+      } catch (_) {}
+    }
+
+    await _supabase.from('lectures').delete().eq('id', id);
   }
 
   String _bucketForType(String type) {
@@ -332,7 +324,6 @@ class LecturesService {
   String _extractStoragePath(String value, String bucket) {
     final trimmed = value.trim();
     if (trimmed.isEmpty) return '';
-
     if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
       return trimmed;
     }
@@ -344,22 +335,13 @@ class LecturesService {
     final bucketIndex = segments.indexWhere(
       (segment) => Uri.decodeComponent(segment) == bucket,
     );
+    if (bucketIndex == -1 || bucketIndex + 1 >= segments.length) return '';
 
-    if (bucketIndex == -1 || bucketIndex + 1 >= segments.length) {
-      return '';
-    }
-
-    return segments
-        .sublist(bucketIndex + 1)
-        .map(Uri.decodeComponent)
-        .join('/');
+    return segments.sublist(bucketIndex + 1).map(Uri.decodeComponent).join('/');
   }
 
   String _sanitizeFileName(String fileName) {
-    final cleaned = fileName.replaceAll(
-      RegExp(r'[^a-zA-Z0-9._-]'),
-      '_',
-    );
+    final cleaned = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
     return cleaned.isEmpty ? 'file' : cleaned;
   }
 }
