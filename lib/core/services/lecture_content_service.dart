@@ -236,6 +236,7 @@ class LectureContentService {
         '${file.lectureId}/${DateTime.now().microsecondsSinceEpoch}_$safeFileName';
     final uploadBytes = bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
 
+    // 1) Upload the new object first.
     await _supabase.storage.from(bucket).uploadBinary(
       newPath,
       uploadBytes,
@@ -243,22 +244,41 @@ class LectureContentService {
     );
 
     try {
-      await _supabase
+      // 2) Update the database row and require an actual returned row.
+      final updated = await _supabase
           .from('lecture_files')
-          .update({'file_url': newPath})
-          .eq('id', file.id);
+          .update({
+            'file_url': newPath,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', file.id)
+          .select('id, file_url')
+          .maybeSingle();
+
+      if (updated == null) {
+        throw Exception(
+          'The file record was not updated. Check lecture_files update permissions (RLS).',
+        );
+      }
+
+      final savedPath = updated['file_url']?.toString();
+      if (savedPath != newPath) {
+        throw Exception('The new file path was not saved to the database.');
+      }
     } catch (e) {
+      // The DB was not switched, so clean up the new object.
       try {
         await _supabase.storage.from(bucket).remove([newPath]);
       } catch (_) {}
       rethrow;
     }
 
+    // 3) Remove the old object only after the DB points to the new one.
     if (oldPath.isNotEmpty && oldPath != newPath) {
       try {
         await _supabase.storage.from(bucket).remove([oldPath]);
       } catch (_) {
-        // The database already points to the new file.
+        // Keep the database pointing to the valid new object even if cleanup fails.
       }
     }
   }
