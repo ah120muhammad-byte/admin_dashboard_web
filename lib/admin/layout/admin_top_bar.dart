@@ -60,12 +60,6 @@ class AdminTopBar extends StatelessWidget {
               isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
             ),
           ),
-          const SizedBox(width: 4),
-          IconButton(
-            tooltip: 'Notifications',
-            onPressed: () {},
-            icon: const Icon(Icons.notifications_none_rounded),
-          ),
           const SizedBox(width: 8),
           Container(
             width: 38,
@@ -75,7 +69,7 @@ class AdminTopBar extends StatelessWidget {
               shape: BoxShape.circle,
             ),
             child: Icon(
-              Icons.person_outline_rounded,
+              Icons.admin_panel_settings_outlined,
               color: scheme.primary,
             ),
           ),
