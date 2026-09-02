@@ -27,19 +27,31 @@ class _LecturesScreenState extends State<LecturesScreen> {
   }
 
   Future<List<AdminLecture>> _loadData() async {
-    final modules = await _service.getModules();
+    final responses = await Future.wait([
+      _service.getModules(),
+      _service.getLectures(),
+    ]);
+
+    final modules = responses[0] as List<LectureModule>;
+    final lectures = responses[1] as List<AdminLecture>;
+
     if (mounted) {
-      setState(() => _modules = modules);
+      setState(() {
+        _modules = modules;
+      });
     }
-    return _service.getLectures();
+
+    return lectures;
   }
 
   Future<void> _refresh() async {
     final future = _loadData();
     if (!mounted) return;
+
     setState(() {
       _lecturesFuture = future;
     });
+
     await future;
   }
 
@@ -165,130 +177,423 @@ class _LecturesScreenState extends State<LecturesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Lectures'),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh',
-            onPressed: _refresh,
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _modules.isEmpty ? null : () => _showLectureDialog(),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add Lecture'),
-      ),
-      body: FutureBuilder<List<AdminLecture>>(
-        future: _lecturesFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return _ErrorView(
-              error: snapshot.error.toString(),
-              onRetry: _refresh,
-            );
-          }
+    return FutureBuilder<List<AdminLecture>>(
+      future: _lecturesFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-          final lectures = _filtered(snapshot.data ?? <AdminLecture>[]);
+        if (snapshot.hasError) {
+          return _ErrorView(
+            error: snapshot.error.toString(),
+            onRetry: _refresh,
+          );
+        }
 
-          return Column(
-            children: [
-              _Filters(
-                modules: _modules,
-                selectedModuleId: _selectedModuleId,
-                selectedPublished: _selectedPublished,
-                onModuleChanged: (value) {
-                  setState(() => _selectedModuleId = value);
-                },
-                onPublishedChanged: (value) {
-                  setState(() => _selectedPublished = value);
-                },
+        final lectures = _filtered(snapshot.data ?? <AdminLecture>[]);
+        final publishedCount = snapshot.data
+                ?.where((lecture) => lecture.isPublished)
+                .length ??
+            0;
+        final draftCount = (snapshot.data?.length ?? 0) - publishedCount;
+        final activeCount = snapshot.data
+                ?.where((lecture) => lecture.isActive)
+                .length ??
+            0;
+        final inactiveCount = (snapshot.data?.length ?? 0) - activeCount;
+
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Lectures',
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Manage lectures and their learning content.',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      FilledButton.icon(
+                        onPressed: _modules.isEmpty
+                            ? null
+                            : () => _showLectureDialog(),
+                        icon: const Icon(Icons.add_rounded),
+                        label: const Text('Add Lecture'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      _StatCard(
+                        icon: Icons.menu_book_rounded,
+                        label: 'Total Lectures',
+                        value: '${snapshot.data?.length ?? 0}',
+                      ),
+                      _StatCard(
+                        icon: Icons.check_circle_outline_rounded,
+                        label: 'Active',
+                        value: '$activeCount',
+                      ),
+                      _StatCard(
+                        icon: Icons.publish_outlined,
+                        label: 'Published',
+                        value: '$publishedCount',
+                      ),
+                      _StatCard(
+                        icon: Icons.drafts_outlined,
+                        label: 'Drafts',
+                        value: '$draftCount',
+                      ),
+                      _StatCard(
+                        icon: Icons.visibility_off_outlined,
+                        label: 'Inactive',
+                        value: '$inactiveCount',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final compact = constraints.maxWidth < 780;
+
+                      final moduleFilter = DropdownButtonFormField<String?>(
+                        initialValue: _selectedModuleId,
+                        decoration: const InputDecoration(
+                          labelText: 'Module',
+                          prefixIcon: Icon(Icons.menu_book_outlined),
+                        ),
+                        items: [
+                          const DropdownMenuItem<String?>(
+                            value: null,
+                            child: Text('All Modules'),
+                          ),
+                          ..._modules.map(
+                            (module) => DropdownMenuItem<String?>(
+                              value: module.id,
+                              child: Text(
+                                module.name,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedModuleId = value;
+                          });
+                        },
+                      );
+
+                      final publicationFilter =
+                          DropdownButtonFormField<bool?>(
+                        initialValue: _selectedPublished,
+                        decoration: const InputDecoration(
+                          labelText: 'Publication',
+                          prefixIcon: Icon(Icons.publish_outlined),
+                        ),
+                        items: const [
+                          DropdownMenuItem<bool?>(
+                            value: null,
+                            child: Text('All'),
+                          ),
+                          DropdownMenuItem<bool?>(
+                            value: true,
+                            child: Text('Published'),
+                          ),
+                          DropdownMenuItem<bool?>(
+                            value: false,
+                            child: Text('Draft'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedPublished = value;
+                          });
+                        },
+                      );
+
+                      return compact
+                          ? Row(
+                              children: [
+                                Expanded(child: moduleFilter),
+                                const SizedBox(width: 10),
+                                Expanded(child: publicationFilter),
+                              ],
+                            )
+                          : Row(
+                              children: [
+                                Expanded(child: moduleFilter),
+                                const SizedBox(width: 10),
+                                SizedBox(
+                                  width: 220,
+                                  child: publicationFilter,
+                                ),
+                              ],
+                            );
+                    },
+                  ),
+                ],
               ),
-              Expanded(
-                child: lectures.isEmpty
-                    ? const Center(child: Text('No lectures found.'))
-                    : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(20, 12, 20, 90),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: lectures.isEmpty
+                  ? const _EmptyLectures()
+                  : RefreshIndicator(
+                      onRefresh: _refresh,
+                      child: ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
                         itemCount: lectures.length,
-                        separatorBuilder: (_, _) =>
-                            const SizedBox(height: 10),
+                        separatorBuilder: (_, _) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
                           final lecture = lectures[index];
                           final module = _moduleFor(lecture.moduleId);
-                          return Card(
-                            clipBehavior: Clip.antiAlias,
-                            child: Material(
-                              color: scheme.surface,
-                              borderRadius: BorderRadius.circular(12),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                  child: Text('${lecture.displayOrder}'),
-                                ),
-                                title: Text(
-                                  lecture.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                subtitle: Text(
-                                  '${module?.name ?? 'Unknown Module'} • '
-                                  '${lecture.isPublished ? 'Published' : 'Draft'}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                trailing: PopupMenuButton<String>(
-                                  onSelected: (value) {
-                                    switch (value) {
-                                      case 'edit':
-                                        _showLectureDialog(lecture: lecture);
-                                        break;
-                                      case 'active':
-                                        _toggleActive(lecture);
-                                        break;
-                                      case 'publish':
-                                        _togglePublished(lecture);
-                                        break;
-                                    }
-                                  },
-                                  itemBuilder: (_) => [
-                                    const PopupMenuItem(
-                                      value: 'edit',
-                                      child: Text('Edit'),
-                                    ),
-                                    PopupMenuItem(
-                                      value: 'publish',
-                                      child: Text(
-                                        lecture.isPublished
-                                            ? 'Unpublish'
-                                            : 'Publish',
-                                      ),
-                                    ),
-                                    PopupMenuItem(
-                                      value: 'active',
-                                      child: Text(
-                                        lecture.isActive
-                                            ? 'Deactivate'
-                                            : 'Activate',
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
+
+                          return _LectureCard(
+                            lecture: lecture,
+                            moduleName: module?.name ?? 'Unknown Module',
+                            onEdit: () =>
+                                _showLectureDialog(lecture: lecture),
+                            onToggleActive: () => _toggleActive(lecture),
+                            onTogglePublished: () =>
+                                _togglePublished(lecture),
                           );
                         },
                       ),
+                    ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _StatCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return SizedBox(
+      width: 170,
+      child: Card(
+        elevation: 0,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Icon(icon, color: theme.colorScheme.primary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(label, style: theme.textTheme.bodySmall),
+                    const SizedBox(height: 3),
+                    Text(
+                      value,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
-          );
-        },
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LectureCard extends StatelessWidget {
+  final AdminLecture lecture;
+  final String moduleName;
+  final VoidCallback onEdit;
+  final VoidCallback onToggleActive;
+  final VoidCallback onTogglePublished;
+
+  const _LectureCard({
+    required this.lecture,
+    required this.moduleName,
+    required this.onEdit,
+    required this.onToggleActive,
+    required this.onTogglePublished,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Card(
+      elevation: 0,
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 28,
+              backgroundColor: theme.colorScheme.primaryContainer,
+              foregroundColor: theme.colorScheme.primary,
+              child: Text(
+                '${lecture.displayOrder}',
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        lecture.title,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      _StatusChip(
+                        label: lecture.isPublished ? 'Published' : 'Draft',
+                        active: lecture.isPublished,
+                      ),
+                      _StatusChip(
+                        label: lecture.isActive ? 'Active' : 'Inactive',
+                        active: lecture.isActive,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    moduleName,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (lecture.description?.trim().isNotEmpty == true) ...[
+                    const SizedBox(height: 5),
+                    Text(
+                      lecture.description!.trim(),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            PopupMenuButton<String>(
+              tooltip: 'Actions',
+              onSelected: (value) {
+                switch (value) {
+                  case 'edit':
+                    onEdit();
+                    break;
+                  case 'publish':
+                    onTogglePublished();
+                    break;
+                  case 'active':
+                    onToggleActive();
+                    break;
+                }
+              },
+              itemBuilder: (_) => [
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Text('Edit'),
+                ),
+                PopupMenuItem(
+                  value: 'publish',
+                  child: Text(
+                    lecture.isPublished ? 'Unpublish' : 'Publish',
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'active',
+                  child: Text(
+                    lecture.isActive ? 'Deactivate' : 'Activate',
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  final String label;
+  final bool active;
+
+  const _StatusChip({
+    required this.label,
+    required this.active,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = active
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurfaceVariant;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -363,7 +668,10 @@ class _LectureDialogState extends State<_LectureDialog> {
       _ => <String>[],
     };
 
-    setState(() => _busy = true);
+    setState(() {
+      _busy = true;
+    });
+
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -399,17 +707,25 @@ class _LectureDialogState extends State<_LectureDialog> {
       );
 
       if (!mounted || input == null) return;
-      setState(() => _contents.add(input));
+      setState(() {
+        _contents.add(input);
+      });
     } catch (e) {
       if (mounted) _showMessage('Unable to add content: $e', error: true);
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          _busy = false;
+        });
+      }
     }
   }
 
   void _removeContent(LectureContentInput content) {
     if (_busy) return;
-    setState(() => _contents.remove(content));
+    setState(() {
+      _contents.remove(content);
+    });
   }
 
   void _showMessage(String message, {bool error = false}) {
@@ -502,7 +818,9 @@ class _LectureDialogState extends State<_LectureDialog> {
                         ? null
                         : (value) {
                             if (value != null) {
-                              setState(() => _moduleId = value);
+                              setState(() {
+                                _moduleId = value;
+                              });
                             }
                           },
                   ),
@@ -779,83 +1097,38 @@ class _ContentEditorDialogState extends State<_ContentEditorDialog> {
   }
 }
 
-class _Filters extends StatelessWidget {
-  final List<LectureModule> modules;
-  final String? selectedModuleId;
-  final bool? selectedPublished;
-  final ValueChanged<String?> onModuleChanged;
-  final ValueChanged<bool?> onPublishedChanged;
-
-  const _Filters({
-    required this.modules,
-    required this.selectedModuleId,
-    required this.selectedPublished,
-    required this.onModuleChanged,
-    required this.onPublishedChanged,
-  });
+class _EmptyLectures extends StatelessWidget {
+  const _EmptyLectures();
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
+    final theme = Theme.of(context);
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 4),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 12,
-        children: [
-          SizedBox(
-            width: width >= 800 ? 280 : 230,
-            child: DropdownButtonFormField<String?>(
-              initialValue: selectedModuleId,
-              decoration: const InputDecoration(
-                labelText: 'Module',
-                prefixIcon: Icon(Icons.menu_book_rounded),
-              ),
-              items: [
-                const DropdownMenuItem<String?>(
-                  value: null,
-                  child: Text('All Modules'),
-                ),
-                ...modules.map(
-                  (module) => DropdownMenuItem<String?>(
-                    value: module.id,
-                    child: Text(
-                      module.name,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ),
-              ],
-              onChanged: onModuleChanged,
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.menu_book_outlined,
+              size: 56,
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.45),
             ),
-          ),
-          SizedBox(
-            width: width >= 800 ? 220 : 190,
-            child: DropdownButtonFormField<bool?>(
-              initialValue: selectedPublished,
-              decoration: const InputDecoration(
-                labelText: 'Publication',
-                prefixIcon: Icon(Icons.publish_rounded),
+            const SizedBox(height: 14),
+            Text(
+              'No lectures found',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
               ),
-              items: const [
-                DropdownMenuItem<bool?>(
-                  value: null,
-                  child: Text('All'),
-                ),
-                DropdownMenuItem<bool?>(
-                  value: true,
-                  child: Text('Published'),
-                ),
-                DropdownMenuItem<bool?>(
-                  value: false,
-                  child: Text('Draft'),
-                ),
-              ],
-              onChanged: onPublishedChanged,
             ),
-          ),
-        ],
+            const SizedBox(height: 6),
+            const Text(
+              'Try changing the filters or add a new lecture.',
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }
