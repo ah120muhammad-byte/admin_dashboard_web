@@ -32,24 +32,17 @@ class AcademicLevel {
 class AcademicLevelsService {
   final SupabaseClient _supabase;
 
-  AcademicLevelsService({
-    SupabaseClient? supabase,
-  }) : _supabase = supabase ?? Supabase.instance.client;
+  AcademicLevelsService({SupabaseClient? supabase})
+      : _supabase = supabase ?? Supabase.instance.client;
 
   Future<List<AcademicLevel>> getLevels() async {
     final response = await _supabase
         .from('academic_levels')
-        .select(
-          'id, name, description, display_order, is_active, image_url',
-        )
+        .select('id, name, description, display_order, is_active, image_url')
         .order('display_order', ascending: true);
 
     return (response as List)
-        .map(
-          (item) => AcademicLevel.fromMap(
-            Map<String, dynamic>.from(item),
-          ),
-        )
+        .map((item) => AcademicLevel.fromMap(Map<String, dynamic>.from(item)))
         .toList();
   }
 
@@ -77,27 +70,25 @@ class AcademicLevelsService {
     required bool isActive,
     String? imageUrl,
   }) async {
-    await _supabase
-        .from('academic_levels')
-        .update({
-          'name': name,
-          'description': description,
-          'display_order': displayOrder,
-          'is_active': isActive,
-          'image_url': imageUrl,
-        })
-        .eq('id', id);
+    await _supabase.from('academic_levels').update({
+      'name': name,
+      'description': description,
+      'display_order': displayOrder,
+      'is_active': isActive,
+      'image_url': imageUrl,
+    }).eq('id', id);
   }
 
   Future<void> setActive({
     required String id,
     required bool isActive,
   }) async {
-    await _supabase
-        .from('academic_levels')
-        .update({
-          'is_active': isActive,
-        })
-        .eq('id', id);
+    await _supabase.from('academic_levels').update({
+      'is_active': isActive,
+    }).eq('id', id);
+  }
+
+  Future<void> deleteLevel(String id) async {
+    await _supabase.from('academic_levels').delete().eq('id', id);
   }
 }

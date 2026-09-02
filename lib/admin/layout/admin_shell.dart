@@ -5,6 +5,7 @@ import 'package:admin_dashboard_web/admin/screens/files/module_files_picker_scre
 import 'package:admin_dashboard_web/admin/screens/notifications/notification_management_screen_v2.dart';
 import 'package:admin_dashboard_web/admin/screens/settings/settings_screen_v2.dart';
 import 'package:admin_dashboard_web/admin/screens/lectures/module_content_picker_screen.dart';
+import 'package:admin_dashboard_web/admin/screens/content/content_deletion_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../admin/screens/dashboard/dashboard_screen.dart';
@@ -52,6 +53,7 @@ class _AdminShellState extends State<AdminShell> {
     ExamsManagementScreen(),
     ExamAttemptsScreen(),
     StudentExamPerformanceScreen(),
+    ContentDeletionScreen(),
   ];
 
   final List<String> _titles = const [
@@ -66,6 +68,7 @@ class _AdminShellState extends State<AdminShell> {
     'Exams',
     'Exam Attempts',
     'Student Performance',
+    'Content Cleanup',
   ];
 
   @override
@@ -79,23 +82,14 @@ class _AdminShellState extends State<AdminShell> {
   }
 
   void _setThemeMode(String mode) {
-    if (mode != 'light' && mode != 'dark' && mode != 'system') {
-      return;
-    }
-    if (_themeMode == mode) {
-      return;
-    }
+    if (mode != 'light' && mode != 'dark' && mode != 'system') return;
+    if (_themeMode == mode) return;
 
-    setState(() {
-      _themeMode = mode;
-    });
-
+    setState(() => _themeMode = mode);
     widget.onThemeModeChanged?.call(mode);
 
     final id = widget.settings.id;
-    if (id.isEmpty) {
-      return;
-    }
+    if (id.isEmpty) return;
 
     AdminSettingsService().updateAdminSettings(
       id: id,
@@ -107,8 +101,7 @@ class _AdminShellState extends State<AdminShell> {
 
   void _toggleTheme() {
     final isDark = _themeMode == 'dark' ||
-        (_themeMode == 'system' &&
-            Theme.of(context).brightness == Brightness.dark);
+        (_themeMode == 'system' && Theme.of(context).brightness == Brightness.dark);
     _setThemeMode(isDark ? 'light' : 'dark');
   }
 
@@ -118,7 +111,6 @@ class _AdminShellState extends State<AdminShell> {
     } catch (_) {}
 
     if (!mounted) return;
-
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const AdminLoginScreen()),
       (_) => false,
@@ -139,9 +131,7 @@ class _AdminShellState extends State<AdminShell> {
         (_themeMode == 'system' && inheritedBrightness == Brightness.dark);
 
     return Theme(
-      data: _themeMode == 'system'
-          ? Theme.of(context)
-          : _currentTheme(context),
+      data: _themeMode == 'system' ? Theme.of(context) : _currentTheme(context),
       child: Scaffold(
         body: Row(
           children: [
@@ -149,9 +139,7 @@ class _AdminShellState extends State<AdminShell> {
               selectedIndex: _selectedIndex,
               compact: effectiveSettings.sidebarCompact,
               analyticsEnabled: effectiveSettings.analyticsEnabled,
-              onItemSelected: (index) => setState(() {
-                _selectedIndex = index;
-              }),
+              onItemSelected: (index) => setState(() => _selectedIndex = index),
               onLogout: _logout,
             ),
             Expanded(
@@ -163,10 +151,7 @@ class _AdminShellState extends State<AdminShell> {
                     onThemeToggle: _toggleTheme,
                   ),
                   Expanded(
-                    child: IndexedStack(
-                      index: _selectedIndex,
-                      children: _pages,
-                    ),
+                    child: IndexedStack(index: _selectedIndex, children: _pages),
                   ),
                 ],
               ),
