@@ -365,7 +365,9 @@ class _UserPersonalAnalyticsState extends State<UserPersonalAnalytics> {
     final theme = Theme.of(context);
     final double maxX = data.scorePoints.isEmpty
         ? 4.0
-        : (data.scorePoints.length - 1).toDouble().clamp(1, double.infinity).toDouble();
+        : data.scorePoints.length <= 1
+            ? 1.0
+            : (data.scorePoints.length - 1).toDouble();
 
     return _card(Column(
       crossAxisAlignment: CrossAxisAlignment.start,
