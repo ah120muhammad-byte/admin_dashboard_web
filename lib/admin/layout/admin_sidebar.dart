@@ -30,6 +30,7 @@ class AdminSidebar extends StatelessWidget {
     _SidebarItem(title: 'Exam Attempts', icon: Icons.assignment_turned_in_outlined),
     _SidebarItem(title: 'Student Performance', icon: Icons.insights_outlined),
     _SidebarItem(title: 'Content Cleanup', icon: Icons.delete_sweep_outlined),
+    _SidebarItem(title: 'Support Inbox', icon: Icons.mark_email_unread_outlined),
   ];
 
   @override
@@ -63,11 +64,13 @@ class AdminSidebar extends StatelessWidget {
         const _SectionGap(),
         const _SectionLabel('MAINTENANCE'),
         _item(context, 11),
+        const _SectionGap(),
+        const _SectionLabel('SUPPORT'),
+        _item(context, 12),
       ]);
     } else {
-      const compactOrder = [0, 1, 2, 3, 4, 5, 6, 8, 9, 7, 11];
+      const compactOrder = [0, 1, 2, 3, 4, 5, 6, 8, 9, 7, 11, 12];
       for (final index in compactOrder) {
-        if (index == 9 && !analyticsEnabled) continue;
         if (index == 10 && !analyticsEnabled) continue;
         items.add(_item(context, index));
       }
