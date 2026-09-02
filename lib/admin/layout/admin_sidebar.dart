@@ -88,28 +88,24 @@ class AdminSidebar extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
                 children: [
                   const _SectionLabel('OVERVIEW'),
-                  _item(0),
+                  _item(context, 0),
                   const _SectionGap(),
-
                   const _SectionLabel('CONTENT'),
-                  _item(2),
-                  _item(3),
-                  _item(4),
-                  _item(5),
+                  _item(context, 2),
+                  _item(context, 3),
+                  _item(context, 4),
+                  _item(context, 5),
                   const _SectionGap(),
-
                   const _SectionLabel('USER MANAGEMENT'),
-                  _item(1),
-                  _item(6),
+                  _item(context, 1),
+                  _item(context, 6),
                   const _SectionGap(),
-
                   const _SectionLabel('ASSESSMENT'),
-                  _item(8),
-                  _item(9),
+                  _item(context, 8),
+                  _item(context, 9),
                   const _SectionGap(),
-
                   const _SectionLabel('SYSTEM'),
-                  _item(7),
+                  _item(context, 7),
                 ],
               ),
             ),
@@ -142,9 +138,10 @@ class AdminSidebar extends StatelessWidget {
     );
   }
 
-  Widget _item(int index) {
+  Widget _item(BuildContext context, int index) {
     final item = _items[index];
     final selected = selectedIndex == index;
+    final scheme = Theme.of(context).colorScheme;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
@@ -164,15 +161,13 @@ class AdminSidebar extends StatelessWidget {
             item.icon,
             color: selected
                 ? AdminTheme.primary
-                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.62),
+                : scheme.onSurface.withValues(alpha: 0.62),
           ),
           title: Text(
             item.title,
             style: TextStyle(
               fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              color: selected
-                  ? AdminTheme.primary
-                  : Theme.of(context).colorScheme.onSurface,
+              color: selected ? AdminTheme.primary : scheme.onSurface,
             ),
           ),
           onTap: () => onItemSelected(index),
