@@ -36,7 +36,7 @@ class AdminSidebar extends StatelessWidget {
       decoration: BoxDecoration(
         color: scheme.surface,
         border: Border(
-          right: BorderSide(color: theme.dividerColor),
+          right: BorderSide(color: theme.dividerColor.withValues(alpha: 0.75)),
         ),
       ),
       child: SafeArea(
@@ -82,41 +82,56 @@ class AdminSidebar extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 22),
             Expanded(
               child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
                 children: [
                   const _SectionLabel('OVERVIEW'),
                   _item(0),
-                  const SizedBox(height: 18),
+                  const _SectionGap(),
+
                   const _SectionLabel('CONTENT'),
                   _item(2),
                   _item(3),
                   _item(4),
                   _item(5),
-                  const SizedBox(height: 18),
-                  const _SectionLabel('MANAGEMENT'),
+                  const _SectionGap(),
+
+                  const _SectionLabel('USER MANAGEMENT'),
                   _item(1),
                   _item(6),
-                  _item(7),
-                  const SizedBox(height: 18),
+                  const _SectionGap(),
+
                   const _SectionLabel('ASSESSMENT'),
                   _item(8),
                   _item(9),
+                  const _SectionGap(),
+
+                  const _SectionLabel('SYSTEM'),
+                  _item(7),
                 ],
               ),
             ),
             const Divider(height: 1),
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
               child: Material(
                 color: Colors.transparent,
                 borderRadius: BorderRadius.circular(11),
                 child: ListTile(
                   dense: true,
-                  leading: const Icon(Icons.logout_rounded),
-                  title: const Text('Logout'),
+                  leading: Icon(
+                    Icons.logout_rounded,
+                    color: scheme.onSurface.withValues(alpha: 0.65),
+                  ),
+                  title: Text(
+                    'Logout',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      color: scheme.onSurface,
+                    ),
+                  ),
                   onTap: onLogout,
                 ),
               ),
@@ -149,13 +164,15 @@ class AdminSidebar extends StatelessWidget {
             item.icon,
             color: selected
                 ? AdminTheme.primary
-                : Colors.black.withValues(alpha: 0.62),
+                : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.62),
           ),
           title: Text(
             item.title,
             style: TextStyle(
               fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-              color: selected ? AdminTheme.primary : Colors.black87,
+              color: selected
+                  ? AdminTheme.primary
+                  : Theme.of(context).colorScheme.onSurface,
             ),
           ),
           onTap: () => onItemSelected(index),
@@ -173,18 +190,25 @@ class _SectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(left: 12, bottom: 8),
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
       child: Text(
         title,
         style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w700,
-          letterSpacing: 1.1,
+          letterSpacing: 1.15,
           color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45),
         ),
       ),
     );
   }
+}
+
+class _SectionGap extends StatelessWidget {
+  const _SectionGap();
+
+  @override
+  Widget build(BuildContext context) => const SizedBox(height: 16);
 }
 
 class _SidebarItem {
