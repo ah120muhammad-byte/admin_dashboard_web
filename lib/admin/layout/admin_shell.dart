@@ -3,7 +3,6 @@ import 'package:admin_dashboard_web/admin/screens/files/lecture_content_screen.d
 import 'package:admin_dashboard_web/admin/screens/lectures/lectures_screen.dart';
 import 'package:admin_dashboard_web/admin/screens/notifications/notifications_screen.dart';
 import 'package:admin_dashboard_web/admin/screens/settings/settings_screen.dart';
-import 'package:admin_dashboard_web/admin/screens/users/users_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../admin/screens/dashboard/dashboard_screen.dart';
