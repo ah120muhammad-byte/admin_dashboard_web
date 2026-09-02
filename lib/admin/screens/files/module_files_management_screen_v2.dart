@@ -44,19 +44,33 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
   Future<void> _refresh() async {
     final future = _load();
     if (!mounted) return;
-    setState(() { _future = future; });
+    setState(() {
+      _future = future;
+    });
     await future;
+  }
+
+  List<String> _extensionsForType(String type) {
+    switch (type.toLowerCase()) {
+      case 'pdf':
+        return ['pdf'];
+      case 'audio':
+        return ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac'];
+      case 'video':
+        return ['mp4', 'mov', 'm4v', 'webm', 'avi', 'mkv'];
+      default:
+        return <String>[];
+    }
   }
 
   Future<void> _addFile(AdminLecture lecture, String type) async {
     if (_busy) return;
-    final extensions = switch (type) {
-      'pdf' => ['pdf'],
-      'audio' => ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac'],
-      'video' => ['mp4', 'mov', 'm4v', 'webm', 'avi', 'mkv'],
-      _ => <String>[],
-    };
-    setState(() { _busy = true; });
+
+    final extensions = _extensionsForType(type);
+    setState(() {
+      _busy = true;
+    });
+
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -64,17 +78,20 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
         withData: true,
       );
       if (!mounted || result == null || result.files.isEmpty) return;
+
       final picked = result.files.single;
       final bytes = picked.bytes;
       if (bytes == null || bytes.isEmpty) {
         _message('Unable to read the selected file.', error: true);
         return;
       }
+
       final titleController = TextEditingController(
         text: picked.name.replaceFirst(RegExp(r'\.[^.]+$'), ''),
       );
-      final orderController = TextEditingController(text: '${_nextOrder(lecture.id)}');
+      final orderController = TextEditingController(text: '${await _nextOrder(lecture.id)}');
       final key = GlobalKey<FormState>();
+
       try {
         final details = await showDialog<_FileDetails>(
           context: context,
@@ -135,12 +152,83 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
     } catch (e) {
       if (mounted) _message('Upload failed: $e', error: true);
     } finally {
-      if (mounted) setState(() { _busy = false; });
+      if (mounted) {
+        setState(() {
+          _busy = false;
+        });
+      }
     }
   }
 
-  int _nextOrder(String lectureId) {
-    return 1;
+  Future<int> _nextOrder(String lectureId) async {
+    final files = await _filesService.getFilesForLecture(lectureId);
+    if (files.isEmpty) return 1;
+    return files.map((file) => file.displayOrder).reduce((a, b) => a > b ? a : b) + 1;
+  }
+
+  Future<void> _replaceFile(LectureFileItem file) async {
+    if (_busy) return;
+
+    final extensions = _extensionsForType(file.fileType);
+    setState(() {
+      _busy = true;
+    });
+
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: extensions,
+        withData: true,
+      );
+      if (!mounted || result == null || result.files.isEmpty) return;
+
+      final picked = result.files.single;
+      final bytes = picked.bytes;
+      if (bytes == null || bytes.isEmpty) {
+        _message('Unable to read the selected file.', error: true);
+        return;
+      }
+
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Replace File'),
+          content: Text(
+            'Replace "${file.title}" with "${picked.name}"? The old storage file will be removed after the new file is linked.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Replace'),
+            ),
+          ],
+        ),
+      );
+
+      if (!mounted || confirmed != true) return;
+
+      await _filesService.replaceLectureFile(
+        file: file,
+        bytes: bytes,
+        newFileName: picked.name,
+      );
+
+      if (!mounted) return;
+      _message('${file.fileType.toUpperCase()} replaced successfully.');
+      await _refresh();
+    } catch (e) {
+      if (mounted) _message('Replace failed: $e', error: true);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+        });
+      }
+    }
   }
 
   Future<void> _openFile(LectureFileItem file) async {
@@ -301,6 +389,7 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
                       onAdd: (type) => _addFile(lecture, type),
                       onOpen: _openFile,
                       onEdit: _editTitle,
+                      onReplace: _replaceFile,
                       onToggle: _toggleFile,
                       onDelete: _deleteFile,
                       busy: _busy,
@@ -323,6 +412,7 @@ class _LectureFilesTile extends StatefulWidget {
   final ValueChanged<String> onAdd;
   final Future<void> Function(LectureFileItem) onOpen;
   final Future<void> Function(LectureFileItem) onEdit;
+  final Future<void> Function(LectureFileItem) onReplace;
   final Future<void> Function(LectureFileItem) onToggle;
   final Future<void> Function(LectureFileItem) onDelete;
   final bool busy;
@@ -334,6 +424,7 @@ class _LectureFilesTile extends StatefulWidget {
     required this.onAdd,
     required this.onOpen,
     required this.onEdit,
+    required this.onReplace,
     required this.onToggle,
     required this.onDelete,
     required this.busy,
@@ -418,6 +509,7 @@ class _LectureFilesTileState extends State<_LectureFilesTile> {
                           switch (action) {
                             case 'open': widget.onOpen(file); break;
                             case 'edit': widget.onEdit(file); break;
+                            case 'replace': widget.onReplace(file); break;
                             case 'toggle': widget.onToggle(file); break;
                             case 'delete': widget.onDelete(file); break;
                           }
@@ -425,6 +517,7 @@ class _LectureFilesTileState extends State<_LectureFilesTile> {
                         itemBuilder: (_) => [
                           const PopupMenuItem(value: 'open', child: Text('Open')),
                           const PopupMenuItem(value: 'edit', child: Text('Edit Title')),
+                          const PopupMenuItem(value: 'replace', child: Text('Replace / Switch File')),
                           PopupMenuItem(value: 'toggle', child: Text(file.isActive ? 'Deactivate' : 'Activate')),
                           const PopupMenuItem(value: 'delete', child: Text('Delete')),
                         ],
