@@ -1,4 +1,3 @@
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/services/admin_users_service.dart';
@@ -104,7 +103,6 @@ class _UsersAnalyticsDashboardState extends State<UsersAnalyticsDashboard> {
         }
 
         final selected = _selectedUser ?? users.first;
-        final theme = Theme.of(context);
 
         return Column(
           children: [
