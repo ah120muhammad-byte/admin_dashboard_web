@@ -3,6 +3,7 @@ import 'package:admin_dashboard_web/admin/screens/files/lecture_content_screen.d
 import 'package:admin_dashboard_web/admin/screens/lectures/lectures_screen.dart';
 import 'package:admin_dashboard_web/admin/screens/notifications/notifications_screen.dart';
 import 'package:admin_dashboard_web/admin/screens/settings/settings_screen.dart';
+import 'package:admin_dashboard_web/admin/screens/users/users_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../admin/screens/dashboard/dashboard_screen.dart';
@@ -53,13 +54,16 @@ class _AdminShellState extends State<AdminShell> {
   Future<void> _logout() async {
     try {
       await Supabase.instance.client.auth.signOut();
-    } finally {
-      if (!mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const AdminLoginScreen()),
-        (route) => false,
-      );
+    } catch (_) {
+      // Even if sign out fails, do not keep the admin UI on screen.
     }
+
+    if (!mounted) return;
+
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const AdminLoginScreen()),
+      (route) => false,
+    );
   }
 
   @override
