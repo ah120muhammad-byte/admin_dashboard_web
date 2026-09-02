@@ -60,8 +60,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         return;
       }
 
-      // The login credentials alone are not enough to access the admin area.
-      // Confirm the user's server-authorized role through the profiles table.
       final profile = await client
           .from('profiles')
           .select('role')
@@ -74,6 +72,8 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
 
       if (role != 'admin') {
         await client.auth.signOut();
+
+        if (!mounted) return;
 
         setState(() {
           _errorMessage = 'This account is not authorized as an admin.';
@@ -122,17 +122,30 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        color: colorScheme.primary,
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: const Icon(
-                        Icons.school_rounded,
-                        color: Colors.white,
-                        size: 34,
+                    Center(
+                      child: Container(
+                        width: 92,
+                        height: 92,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surface,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: colorScheme.outlineVariant,
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(17),
+                          child: Image.asset(
+                            'images/icon-1.png',
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => Icon(
+                              Icons.school_rounded,
+                              color: colorScheme.primary,
+                              size: 44,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 24),
