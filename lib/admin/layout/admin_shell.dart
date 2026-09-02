@@ -1,4 +1,5 @@
 import 'package:admin_dashboard_web/admin/screens/exams/exam_attempts_screen.dart';
+import 'package:admin_dashboard_web/admin/screens/exams/exams_management_screen.dart';
 import 'package:admin_dashboard_web/admin/screens/files/module_files_picker_screen.dart';
 import 'package:admin_dashboard_web/admin/screens/notifications/notifications_screen.dart';
 import 'package:admin_dashboard_web/admin/screens/settings/settings_screen.dart';
@@ -9,7 +10,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../admin/screens/dashboard/dashboard_screen.dart';
 import 'package:admin_dashboard_web/admin/screens/levels/academic_levels_screen.dart';
 import '../../admin/screens/modules/modules_screen.dart';
-import '../screens/exams/exams_screen.dart';
 import '../screens/admin_login_screen.dart';
 import '../screens/users/users_analytics_dashboard.dart';
 import 'admin_sidebar.dart';
@@ -34,7 +34,7 @@ class _AdminShellState extends State<AdminShell> {
     ModuleFilesPickerScreen(),
     NotificationsScreen(),
     SettingsScreen(),
-    ExamsScreen(),
+    ExamsManagementScreen(),
     ExamAttemptsScreen(),
   ];
 
