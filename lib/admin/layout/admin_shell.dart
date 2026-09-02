@@ -1,5 +1,5 @@
 import 'package:admin_dashboard_web/admin/screens/exams/exam_attempts_screen.dart';
-import 'package:admin_dashboard_web/admin/screens/files/lecture_content_screen.dart';
+import 'package:admin_dashboard_web/admin/screens/files/module_files_picker_screen.dart';
 import 'package:admin_dashboard_web/admin/screens/notifications/notifications_screen.dart';
 import 'package:admin_dashboard_web/admin/screens/settings/settings_screen.dart';
 import 'package:admin_dashboard_web/admin/screens/lectures/module_content_picker_screen.dart';
@@ -31,7 +31,7 @@ class _AdminShellState extends State<AdminShell> {
     AcademicLevelsScreen(),
     ModulesScreen(),
     ModuleContentPickerScreen(),
-    LectureContentScreen(),
+    ModuleFilesPickerScreen(),
     NotificationsScreen(),
     SettingsScreen(),
     ExamsScreen(),
