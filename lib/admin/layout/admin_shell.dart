@@ -18,6 +18,7 @@ import 'admin_top_bar.dart';
 
 class AdminShell extends StatefulWidget {
   final AdminSettings settings;
+  final ValueChanged<String>? onThemeModeChanged;
 
   const AdminShell({
     super.key,
@@ -27,6 +28,7 @@ class AdminShell extends StatefulWidget {
       sidebarCompact: false,
       analyticsEnabled: true,
     ),
+    this.onThemeModeChanged,
   });
 
   @override
@@ -68,9 +70,7 @@ class _AdminShellState extends State<AdminShell> {
     try {
       await Supabase.instance.client.auth.signOut();
     } catch (_) {}
-
     if (!mounted) return;
-
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const AdminLoginScreen()),
       (_) => false,
@@ -79,6 +79,8 @@ class _AdminShellState extends State<AdminShell> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
       body: Row(
         children: [
@@ -94,7 +96,15 @@ class _AdminShellState extends State<AdminShell> {
           Expanded(
             child: Column(
               children: [
-                AdminTopBar(title: _titles[_selectedIndex]),
+                AdminTopBar(
+                  title: _titles[_selectedIndex],
+                  isDark: isDark,
+                  onThemeToggle: widget.onThemeModeChanged == null
+                      ? null
+                      : () => widget.onThemeModeChanged!(
+                            isDark ? 'light' : 'dark',
+                          ),
+                ),
                 Expanded(
                   child: IndexedStack(
                     index: _selectedIndex,
