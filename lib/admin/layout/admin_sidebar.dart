@@ -24,6 +24,7 @@ class AdminSidebar extends StatelessWidget {
     _SidebarItem(title: 'Settings', icon: Icons.settings_outlined),
     _SidebarItem(title: 'Exams', icon: Icons.quiz_outlined),
     _SidebarItem(title: 'Exam Attempts', icon: Icons.assignment_turned_in_outlined),
+    _SidebarItem(title: 'Student Performance', icon: Icons.insights_outlined),
   ];
 
   @override
@@ -103,6 +104,7 @@ class AdminSidebar extends StatelessWidget {
                   const _SectionLabel('ASSESSMENT'),
                   _item(context, 8),
                   _item(context, 9),
+                  _item(context, 10),
                   const _SectionGap(),
                   const _SectionLabel('SYSTEM'),
                   _item(context, 7),
@@ -179,7 +181,6 @@ class AdminSidebar extends StatelessWidget {
 
 class _SectionLabel extends StatelessWidget {
   final String title;
-
   const _SectionLabel(this.title);
 
   @override
@@ -201,7 +202,6 @@ class _SectionLabel extends StatelessWidget {
 
 class _SectionGap extends StatelessWidget {
   const _SectionGap();
-
   @override
   Widget build(BuildContext context) => const SizedBox(height: 16);
 }
@@ -209,9 +209,5 @@ class _SectionGap extends StatelessWidget {
 class _SidebarItem {
   final String title;
   final IconData icon;
-
-  const _SidebarItem({
-    required this.title,
-    required this.icon,
-  });
+  const _SidebarItem({required this.title, required this.icon});
 }
