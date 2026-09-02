@@ -73,8 +73,7 @@ class _UserPersonalAnalyticsState extends State<UserPersonalAnalytics> {
     final scores = <FlSpot>[];
     for (var i = 0; i < completedAttempts.length; i++) {
       final score = (completedAttempts[i]['score'] as num?)?.toDouble() ??
-          double.tryParse(completedAttempts[i]['score']?.toString() ?? '') ??
-          0;
+          double.tryParse(completedAttempts[i]['score']?.toString() ?? '') ?? 0;
       scores.add(FlSpot(i.toDouble(), score));
     }
 
@@ -93,7 +92,10 @@ class _UserPersonalAnalyticsState extends State<UserPersonalAnalytics> {
 
     final avg = completedAttempts.isEmpty
         ? 0.0
-        : completedAttempts.map((row) => (row['score'] as num?)?.toDouble() ?? double.tryParse(row['score']?.toString() ?? '') ?? 0).reduce((a, b) => a + b) / completedAttempts.length;
+        : completedAttempts
+                .map((row) => (row['score'] as num?)?.toDouble() ?? double.tryParse(row['score']?.toString() ?? '') ?? 0)
+                .reduce((a, b) => a + b) /
+            completedAttempts.length;
 
     return _PersonalAnalytics(
       activityPoints: [
@@ -122,14 +124,23 @@ class _UserPersonalAnalyticsState extends State<UserPersonalAnalytics> {
       future: _future,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator()));
+          return const Padding(
+            padding: EdgeInsets.all(24),
+            child: Center(child: CircularProgressIndicator()),
+          );
         }
+
         if (snapshot.hasError || snapshot.data == null) {
           return Column(
             children: [
               Row(
                 children: [
-                  const Expanded(child: Text('Personal Analytics', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
+                  const Expanded(
+                    child: Text(
+                      'Personal Analytics',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    ),
+                  ),
                   IconButton(onPressed: _refresh, icon: const Icon(Icons.refresh_rounded)),
                 ],
               ),
@@ -168,20 +179,27 @@ class _UserPersonalAnalyticsState extends State<UserPersonalAnalytics> {
             LayoutBuilder(
               builder: (context, constraints) {
                 final wide = constraints.maxWidth >= 900;
-                final activityCard = _buildActivityChart(context, data);
-                final scoreCard = _buildScoreChart(context, data);
-                return wide
-                    ? Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(child: activityCard),
-                          const SizedBox(width: 14),
-                          Expanded(child: scoreCard),
-                        ],
-                      )
-                    : Column(
-                        children: [activityCard, const SizedBox(height: 14), scoreCard],
-                      );
+                final activity = _buildActivityChart(context, data);
+                final score = _buildScoreChart(context, data);
+                final completion = _buildCompletionPie(context, data);
+
+                final charts = <Widget>[activity, score, completion];
+                if (wide) {
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: charts[0]),
+                      const SizedBox(width: 14),
+                      Expanded(child: charts[1]),
+                      const SizedBox(width: 14),
+                      SizedBox(width: 300, child: charts[2]),
+                    ],
+                  );
+                }
+
+                return Column(
+                  children: [activity, const SizedBox(height: 14), score, const SizedBox(height: 14), completion],
+                );
               },
             ),
           ],
@@ -200,7 +218,10 @@ class _UserPersonalAnalyticsState extends State<UserPersonalAnalytics> {
       ('Audios Completed', data.audiosCompleted, Icons.audio_file_rounded),
       ('Exam Attempts', data.examAttempts, Icons.quiz_rounded),
       ('Completed Exams', data.completedExams, Icons.task_alt_rounded),
+      ('Average Score', '${data.averageScore.toStringAsFixed(1)}%', Icons.analytics_outlined),
+      ('Success Rate', '${data.successRate.toStringAsFixed(1)}%', Icons.trending_up_rounded),
     ];
+
     return Wrap(
       spacing: 12,
       runSpacing: 12,
@@ -214,7 +235,16 @@ class _UserPersonalAnalyticsState extends State<UserPersonalAnalytics> {
               children: [
                 Icon(item.$3, color: theme.colorScheme.primary),
                 const SizedBox(width: 10),
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(item.$1, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall), const SizedBox(height: 3), Text('${item.$2}', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700))])),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(item.$1, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall),
+                      const SizedBox(height: 3),
+                      Text('${item.$2}', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -228,7 +258,7 @@ class _UserPersonalAnalyticsState extends State<UserPersonalAnalytics> {
     return _card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text('30-Day Activity', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
       const SizedBox(height: 4),
-      Text('This user only: lecture progress events + exam activity', style: theme.textTheme.bodySmall),
+      Text('Lecture progress events + exam activity for this user', style: theme.textTheme.bodySmall),
       const SizedBox(height: 18),
       SizedBox(
         height: 230,
@@ -242,14 +272,16 @@ class _UserPersonalAnalyticsState extends State<UserPersonalAnalytics> {
             rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
             topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
           ),
-          lineBarsData: [LineChartBarData(
-            spots: data.activityPoints,
-            isCurved: true,
-            barWidth: 3,
-            dotData: const FlDotData(show: false),
-            color: theme.colorScheme.primary,
-            belowBarData: BarAreaData(show: true, color: theme.colorScheme.primary.withValues(alpha: 0.08)),
-          )],
+          lineBarsData: [
+            LineChartBarData(
+              spots: data.activityPoints,
+              isCurved: true,
+              barWidth: 3,
+              dotData: const FlDotData(show: false),
+              color: theme.colorScheme.primary,
+              belowBarData: BarAreaData(show: true, color: theme.colorScheme.primary.withValues(alpha: 0.08)),
+            ),
+          ],
         )),
       ),
     ]));
@@ -257,11 +289,12 @@ class _UserPersonalAnalyticsState extends State<UserPersonalAnalytics> {
 
   Widget _buildScoreChart(BuildContext context, _PersonalAnalytics data) {
     final theme = Theme.of(context);
-    final maxX = data.scorePoints.isEmpty ? 4.0 : (data.scorePoints.length - 1).toDouble().clamp(1, double.infinity);
+    final maxX = data.scorePoints.isEmpty ? 1.0 : (data.scorePoints.length - 1).toDouble().clamp(1.0, double.infinity).toDouble();
+
     return _card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text('Exam Score Trend', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
       const SizedBox(height: 4),
-      Text('Completed attempts for this user', style: theme.textTheme.bodySmall),
+      Text('Completed exam attempts for this user', style: theme.textTheme.bodySmall),
       const SizedBox(height: 18),
       SizedBox(
         height: 230,
@@ -278,20 +311,73 @@ class _UserPersonalAnalyticsState extends State<UserPersonalAnalytics> {
                   rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
                   topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 ),
-                lineBarsData: [LineChartBarData(
-                  spots: data.scorePoints,
-                  isCurved: true,
-                  barWidth: 3,
-                  color: theme.colorScheme.primary,
-                  dotData: const FlDotData(show: true),
-                )],
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: data.scorePoints,
+                    isCurved: true,
+                    barWidth: 3,
+                    color: theme.colorScheme.primary,
+                    dotData: const FlDotData(show: true),
+                  ),
+                ],
               )),
       ),
-      const SizedBox(height: 10),
-      Wrap(spacing: 18, runSpacing: 6, children: [
-        Text('Average: ${data.averageScore.toStringAsFixed(1)}%'),
-        Text('Success: ${data.successRate.toStringAsFixed(1)}%'),
-      ]),
+    ]));
+  }
+
+  Widget _buildCompletionPie(BuildContext context, _PersonalAnalytics data) {
+    final theme = Theme.of(context);
+    final completed = data.videosCompleted + data.audiosCompleted + data.completedExams;
+    final remaining = data.lecturesOpened - (data.videosCompleted + data.audiosCompleted);
+
+    final values = [
+      ('Video', data.videosCompleted, theme.colorScheme.primary),
+      ('Audio', data.audiosCompleted, theme.colorScheme.tertiary),
+      ('Exams', data.completedExams, theme.colorScheme.secondary),
+      ('Other / In Progress', remaining < 0 ? 0 : remaining, theme.colorScheme.outlineVariant),
+    ];
+    final total = values.fold<int>(0, (sum, item) => sum + item.$2);
+
+    return _card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('Completion Mix', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+      const SizedBox(height: 4),
+      Text('Only this user', style: theme.textTheme.bodySmall),
+      const SizedBox(height: 14),
+      SizedBox(
+        height: 210,
+        child: total == 0
+            ? const Center(child: Text('No activity yet'))
+            : PieChart(PieChartData(
+                centerSpaceRadius: 45,
+                sectionsSpace: 3,
+                sections: [
+                  for (final item in values)
+                    if (item.$2 > 0)
+                      PieChartSectionData(
+                        value: item.$2.toDouble(),
+                        title: '${((item.$2 / total) * 100).round()}%',
+                        radius: 58,
+                        color: item.$3,
+                        titleStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                      ),
+                ],
+              )),
+      ),
+      const SizedBox(height: 8),
+      for (final item in values)
+        if (item.$2 > 0)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 7),
+            child: Row(
+              children: [
+                Container(width: 9, height: 9, decoration: BoxDecoration(color: item.$3, shape: BoxShape.circle)),
+                const SizedBox(width: 7),
+                Expanded(child: Text(item.$1)),
+                Text('${item.$2}', style: const TextStyle(fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ),
+      if (completed > 0) const SizedBox(height: 2),
     ]));
   }
 }
