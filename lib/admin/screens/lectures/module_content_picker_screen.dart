@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/services/lectures_service.dart';
-import '../modules/module_management_screen.dart';
+import '../modules/module_management_screen_v2.dart';
 
 class ModuleContentPickerScreen extends StatefulWidget {
   const ModuleContentPickerScreen({super.key});
@@ -24,9 +24,7 @@ class _ModuleContentPickerScreenState extends State<ModuleContentPickerScreen> {
     _searchController.addListener(() {
       final value = _searchController.text.trim().toLowerCase();
       if (value == _search) return;
-      setState(() {
-        _search = value;
-      });
+      setState(() { _search = value; });
     });
   }
 
@@ -41,7 +39,6 @@ class _ModuleContentPickerScreenState extends State<ModuleContentPickerScreen> {
       _service.getModules(),
       _service.getLectures(),
     ]);
-
     return _PickerData(
       modules: results[0] as List<LectureModule>,
       lectures: results[1] as List<AdminLecture>,
@@ -51,9 +48,7 @@ class _ModuleContentPickerScreenState extends State<ModuleContentPickerScreen> {
   Future<void> _refresh() async {
     final future = _load();
     if (!mounted) return;
-    setState(() {
-      _future = future;
-    });
+    setState(() { _future = future; });
     await future;
   }
 
@@ -75,7 +70,6 @@ class _ModuleContentPickerScreenState extends State<ModuleContentPickerScreen> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-
         if (snapshot.hasError || snapshot.data == null) {
           return Center(
             child: FilledButton.icon(
@@ -89,9 +83,7 @@ class _ModuleContentPickerScreenState extends State<ModuleContentPickerScreen> {
         final data = snapshot.data!;
         final modules = _search.isEmpty
             ? data.modules
-            : data.modules
-                .where((module) => module.name.toLowerCase().contains(_search))
-                .toList();
+            : data.modules.where((m) => m.name.toLowerCase().contains(_search)).toList();
 
         return Column(
           children: [
@@ -107,16 +99,12 @@ class _ModuleContentPickerScreenState extends State<ModuleContentPickerScreen> {
                           children: [
                             Text(
                               'Lecture Content',
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
+                              style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               'Select a module to manage its lectures and files.',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
+                              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                             ),
                           ],
                         ),
@@ -129,30 +117,20 @@ class _ModuleContentPickerScreenState extends State<ModuleContentPickerScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          decoration: const InputDecoration(
-                            hintText: 'Search modules...',
-                            prefixIcon: Icon(Icons.search_rounded),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      _SummaryChip(
-                        icon: Icons.school_outlined,
-                        label: 'Modules',
-                        value: '${data.modules.length}',
-                      ),
-                      const SizedBox(width: 8),
-                      _SummaryChip(
-                        icon: Icons.menu_book_outlined,
-                        label: 'Lectures',
-                        value: '${data.lectures.length}',
-                      ),
-                    ],
+                  TextField(
+                    controller: _searchController,
+                    decoration: const InputDecoration(
+                      hintText: 'Search modules...',
+                      prefixIcon: Icon(Icons.search_rounded),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '${modules.length} module${modules.length == 1 ? '' : 's'}',
+                      style: theme.textTheme.bodySmall,
+                    ),
                   ),
                 ],
               ),
@@ -167,19 +145,15 @@ class _ModuleContentPickerScreenState extends State<ModuleContentPickerScreen> {
                         padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
                         gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                           maxCrossAxisExtent: 420,
-                          mainAxisExtent: 210,
+                          mainAxisExtent: 200,
                           crossAxisSpacing: 14,
                           mainAxisSpacing: 14,
                         ),
                         itemCount: modules.length,
                         itemBuilder: (context, index) {
                           final module = modules[index];
-                          final lectures = data.lectures
-                              .where((lecture) => lecture.moduleId == module.id)
-                              .toList();
-                          final published =
-                              lectures.where((lecture) => lecture.isPublished).length;
-
+                          final lectures = data.lectures.where((l) => l.moduleId == module.id).toList();
+                          final published = lectures.where((l) => l.isPublished).length;
                           return _ModuleCard(
                             module: module,
                             lectureCount: lectures.length,
@@ -200,38 +174,7 @@ class _ModuleContentPickerScreenState extends State<ModuleContentPickerScreen> {
 class _PickerData {
   final List<LectureModule> modules;
   final List<AdminLecture> lectures;
-
   const _PickerData({required this.modules, required this.lectures});
-}
-
-class _SummaryChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-
-  const _SummaryChip({required this.icon, required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 17, color: theme.colorScheme.primary),
-          const SizedBox(width: 7),
-          Text(label, style: theme.textTheme.bodySmall),
-          const SizedBox(width: 6),
-          Text(value, style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
-        ],
-      ),
-    );
-  }
 }
 
 class _ModuleCard extends StatelessWidget {
@@ -295,7 +238,7 @@ class _ModuleCard extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'Click to manage lectures and PDF / Audio / Video files',
+                'Open to manage lectures & PDF / Audio / Video',
                 style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
               ),
             ],
@@ -309,7 +252,6 @@ class _ModuleCard extends StatelessWidget {
 class _Metric extends StatelessWidget {
   final String label;
   final String value;
-
   const _Metric({required this.label, required this.value});
 
   @override
