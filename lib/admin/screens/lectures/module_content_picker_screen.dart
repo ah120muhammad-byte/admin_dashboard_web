@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/services/lectures_service.dart';
-import '../modules/module_management_screen_v2.dart';
+import '../modules/module_management_screen_v3.dart';
 
 class ModuleContentPickerScreen extends StatefulWidget {
   const ModuleContentPickerScreen({super.key});
@@ -21,17 +21,22 @@ class _ModuleContentPickerScreenState extends State<ModuleContentPickerScreen> {
   void initState() {
     super.initState();
     _future = _load();
-    _searchController.addListener(() {
-      final value = _searchController.text.trim().toLowerCase();
-      if (value == _search) return;
-      setState(() { _search = value; });
-    });
+    _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
+    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged() {
+    final value = _searchController.text.trim().toLowerCase();
+    if (value == _search) return;
+    setState(() {
+      _search = value;
+    });
   }
 
   Future<_PickerData> _load() async {
@@ -48,7 +53,9 @@ class _ModuleContentPickerScreenState extends State<ModuleContentPickerScreen> {
   Future<void> _refresh() async {
     final future = _load();
     if (!mounted) return;
-    setState(() { _future = future; });
+    setState(() {
+      _future = future;
+    });
     await future;
   }
 
@@ -63,7 +70,6 @@ class _ModuleContentPickerScreenState extends State<ModuleContentPickerScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return FutureBuilder<_PickerData>(
       future: _future,
       builder: (context, snapshot) {
@@ -83,7 +89,9 @@ class _ModuleContentPickerScreenState extends State<ModuleContentPickerScreen> {
         final data = snapshot.data!;
         final modules = _search.isEmpty
             ? data.modules
-            : data.modules.where((m) => m.name.toLowerCase().contains(_search)).toList();
+            : data.modules
+                .where((module) => module.name.toLowerCase().contains(_search))
+                .toList();
 
         return Column(
           children: [
@@ -99,12 +107,16 @@ class _ModuleContentPickerScreenState extends State<ModuleContentPickerScreen> {
                           children: [
                             Text(
                               'Lecture Content',
-                              style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                             const SizedBox(height: 4),
                             Text(
                               'Select a module to manage its lectures and files.',
-                              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           ],
                         ),
@@ -152,12 +164,12 @@ class _ModuleContentPickerScreenState extends State<ModuleContentPickerScreen> {
                         itemCount: modules.length,
                         itemBuilder: (context, index) {
                           final module = modules[index];
-                          final lectures = data.lectures.where((l) => l.moduleId == module.id).toList();
-                          final published = lectures.where((l) => l.isPublished).length;
+                          final lectureCount = data.lectures
+                              .where((lecture) => lecture.moduleId == module.id)
+                              .length;
                           return _ModuleCard(
                             module: module,
-                            lectureCount: lectures.length,
-                            publishedCount: published,
+                            lectureCount: lectureCount,
                             onTap: () => _openModule(module),
                           );
                         },
@@ -174,19 +186,18 @@ class _ModuleContentPickerScreenState extends State<ModuleContentPickerScreen> {
 class _PickerData {
   final List<LectureModule> modules;
   final List<AdminLecture> lectures;
+
   const _PickerData({required this.modules, required this.lectures});
 }
 
 class _ModuleCard extends StatelessWidget {
   final LectureModule module;
   final int lectureCount;
-  final int publishedCount;
   final VoidCallback onTap;
 
   const _ModuleCard({
     required this.module,
     required this.lectureCount,
-    required this.publishedCount,
     required this.onTap,
   });
 
@@ -194,7 +205,6 @@ class _ModuleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-
     return Card(
       elevation: 0,
       clipBehavior: Clip.antiAlias,
@@ -229,14 +239,25 @@ class _ModuleCard extends StatelessWidget {
                 ],
               ),
               const Spacer(),
-              Row(
-                children: [
-                  Expanded(child: _Metric(label: 'Lectures', value: '$lectureCount')),
-                  const SizedBox(width: 10),
-                  Expanded(child: _Metric(label: 'Published', value: '$publishedCount')),
-                ],
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: scheme.surfaceContainerHighest.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.menu_book_outlined, size: 18, color: scheme.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      '$lectureCount ${lectureCount == 1 ? 'lecture' : 'lectures'}',
+                      style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Text(
                 'Open to manage lectures & PDF / Audio / Video',
                 style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
@@ -244,32 +265,6 @@ class _ModuleCard extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _Metric extends StatelessWidget {
-  final String label;
-  final String value;
-  const _Metric({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(11),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: theme.textTheme.bodySmall),
-          const SizedBox(height: 2),
-          Text(value, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-        ],
       ),
     );
   }
