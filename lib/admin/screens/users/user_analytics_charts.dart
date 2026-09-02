@@ -3,6 +3,27 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../core/services/admin_users_service.dart';
+import 'users_screen.dart';
+
+class UsersAnalyticsDashboard extends StatelessWidget {
+  const UsersAnalyticsDashboard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        SizedBox(
+          height: 610,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(28, 24, 28, 0),
+            child: UserAnalyticsCharts(key: const ValueKey('user-analytics')),
+          ),
+        ),
+        const Expanded(child: UsersManagementScreen()),
+      ],
+    );
+  }
+}
 
 class UserAnalyticsCharts extends StatefulWidget {
   const UserAnalyticsCharts({super.key});
@@ -319,10 +340,7 @@ class _UserAnalyticsChartsState extends State<UserAnalyticsCharts> {
                         if (index < 0 || index >= items.length) return const SizedBox.shrink();
                         return Padding(
                           padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                            '${index + 1}',
-                            style: theme.textTheme.labelSmall,
-                          ),
+                          child: Text('${index + 1}', style: theme.textTheme.labelSmall),
                         );
                       },
                     ),
