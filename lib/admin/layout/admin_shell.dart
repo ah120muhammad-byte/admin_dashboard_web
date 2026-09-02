@@ -15,6 +15,7 @@ import '../screens/users/users_analytics_dashboard.dart';
 import '../../core/services/admin_settings_service.dart';
 import 'admin_sidebar.dart';
 import 'admin_top_bar.dart';
+import 'admin_theme.dart';
 
 class AdminShell extends StatefulWidget {
   final AdminSettings settings;
