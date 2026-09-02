@@ -10,6 +10,7 @@ import '../../admin/screens/dashboard/dashboard_screen.dart';
 import 'package:admin_dashboard_web/admin/screens/levels/academic_levels_screen.dart';
 import '../../admin/screens/modules/modules_screen.dart';
 import '../screens/exams/exams_screen.dart';
+import '../screens/admin_login_screen.dart';
 import 'admin_sidebar.dart';
 import 'admin_top_bar.dart';
 
@@ -41,9 +42,15 @@ class _AdminShellState extends State<AdminShell> {
   ];
 
   Future<void> _logout() async {
-    await Supabase.instance.client.auth.signOut();
-    if (!mounted) return;
-    Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+    try {
+      await Supabase.instance.client.auth.signOut();
+    } finally {
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AdminLoginScreen()),
+        (route) => false,
+      );
+    }
   }
 
   @override
@@ -51,7 +58,11 @@ class _AdminShellState extends State<AdminShell> {
     return Scaffold(
       body: Row(
         children: [
-          AdminSidebar(selectedIndex: _selectedIndex, onItemSelected: (index) => setState(() => _selectedIndex = index), onLogout: _logout),
+          AdminSidebar(
+            selectedIndex: _selectedIndex,
+            onItemSelected: (index) => setState(() => _selectedIndex = index),
+            onLogout: _logout,
+          ),
           Expanded(
             child: Column(
               children: [
