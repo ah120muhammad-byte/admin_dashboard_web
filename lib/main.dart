@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:admin_dashboard_web/admin/layout/admin_shell.dart';
+import 'package:admin_dashboard_web/admin/layout/admin_theme.dart';
 import 'package:admin_dashboard_web/admin/screens/admin_login_screen.dart';
 
 Future<void> main() async {
@@ -22,7 +23,6 @@ Future<void> main() async {
           .select('role')
           .eq('id', session.user.id)
           .maybeSingle();
-
       isAdmin = profile?['role']?.toString().toLowerCase().trim() == 'admin';
     } catch (_) {
       isAdmin = false;
@@ -35,20 +35,14 @@ Future<void> main() async {
 class AdminApp extends StatelessWidget {
   final bool isAdmin;
 
-  const AdminApp({
-    super.key,
-    required this.isAdmin,
-  });
+  const AdminApp({super.key, required this.isAdmin});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'MediData Admin',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-      ),
+      theme: AdminTheme.lightTheme,
       home: isAdmin ? const AdminShell() : const AdminLoginScreen(),
     );
   }
