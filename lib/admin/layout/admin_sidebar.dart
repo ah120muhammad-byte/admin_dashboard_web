@@ -91,18 +91,10 @@ class AdminSidebar extends StatelessWidget {
             Padding(
               padding: EdgeInsets.symmetric(horizontal: compact ? 10 : 20),
               child: compact
-                  ? const Icon(Icons.medical_services_rounded, color: AdminTheme.primary, size: 36)
+                  ? _LogoMark(size: 40)
                   : Row(
                       children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: AdminTheme.primary,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(Icons.medical_services_rounded, color: Colors.white),
-                        ),
+                        _LogoMark(size: 44),
                         const SizedBox(width: 12),
                         const Expanded(
                           child: Column(
@@ -176,6 +168,40 @@ class AdminSidebar extends StatelessWidget {
           color: selected ? AdminTheme.primary.withValues(alpha: .10) : Colors.transparent,
           borderRadius: BorderRadius.circular(11),
           child: tile,
+        ),
+      ),
+    );
+  }
+}
+
+class _LogoMark extends StatelessWidget {
+  final double size;
+
+  const _LogoMark({required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: size,
+      height: size,
+      padding: EdgeInsets.all(size * .10),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(size * .27),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(size * .20),
+        child: Image.asset(
+          'images/icon-1.png',
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => Icon(
+            Icons.medical_services_rounded,
+            color: AdminTheme.primary,
+            size: size * .55,
+          ),
         ),
       ),
     );
