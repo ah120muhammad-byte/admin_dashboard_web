@@ -532,8 +532,9 @@ class _NotificationDialogState extends State<_NotificationDialog> {
 
   void _save() {
     if (!_formKey.currentState!.validate()) return;
-    if ((_typeNeedsLecture || _audienceNeedsLecture) && _lectureId == null)
+    if ((_typeNeedsLecture || _audienceNeedsLecture) && _lectureId == null) {
       return;
+    }
     if (_audience == 'specific' && _selected.isEmpty) return;
 
     Navigator.of(context).pop(
