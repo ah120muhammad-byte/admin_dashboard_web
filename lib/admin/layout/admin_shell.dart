@@ -6,6 +6,7 @@ import 'package:admin_dashboard_web/admin/screens/notifications/notification_man
 import 'package:admin_dashboard_web/admin/screens/settings/settings_screen_v2.dart';
 import 'package:admin_dashboard_web/admin/screens/lectures/module_content_picker_screen.dart';
 import 'package:admin_dashboard_web/admin/screens/content/content_deletion_screen.dart';
+import 'package:admin_dashboard_web/admin/screens/support/support_inbox_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../admin/screens/dashboard/dashboard_screen.dart';
@@ -54,6 +55,7 @@ class _AdminShellState extends State<AdminShell> {
     ExamAttemptsScreen(),
     StudentExamPerformanceScreen(),
     ContentDeletionScreen(),
+    SupportInboxScreen(),
   ];
 
   final List<String> _titles = const [
@@ -69,6 +71,7 @@ class _AdminShellState extends State<AdminShell> {
     'Exam Attempts',
     'Student Performance',
     'Content Cleanup',
+    'Support Inbox',
   ];
 
   @override
