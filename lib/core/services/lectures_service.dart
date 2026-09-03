@@ -209,6 +209,34 @@ class LecturesService {
     return 1;
   }
 
+  Future<void> reorderLectures({
+    required List<String> lectureIds,
+  }) async {
+    await Future.wait(
+      List.generate(
+        lectureIds.length,
+        (index) => _supabase
+            .from('lectures')
+            .update({'display_order': index + 1})
+            .eq('id', lectureIds[index]),
+      ),
+    );
+  }
+
+  Future<void> reorderLectureFiles({
+    required List<String> fileIds,
+  }) async {
+    await Future.wait(
+      List.generate(
+        fileIds.length,
+        (index) => _supabase
+            .from('lecture_files')
+            .update({'display_order': index + 1})
+            .eq('id', fileIds[index]),
+      ),
+    );
+  }
+
   Future<void> replaceLectureFile({
     required String lectureFileId,
     required String lectureId,
