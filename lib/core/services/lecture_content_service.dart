@@ -224,6 +224,20 @@ class LectureContentService {
     return 1;
   }
 
+  Future<void> reorderLectureFiles({
+    required List<String> fileIds,
+  }) async {
+    await Future.wait(
+      List.generate(
+        fileIds.length,
+        (index) => _supabase
+            .from('lecture_files')
+            .update({'display_order': index + 1})
+            .eq('id', fileIds[index]),
+      ),
+    );
+  }
+
   /// Replaces the storage object and the displayed title behind an existing
   /// lecture_files row.
   ///
@@ -245,7 +259,6 @@ class LectureContentService {
     final newTitle = _titleFromFileName(newFileName);
     final uploadBytes = bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
 
-    // 1. Upload the replacement first. Never overwrite the old object.
     await _supabase.storage.from(bucket).uploadBinary(
       newPath,
       uploadBytes,
@@ -253,7 +266,6 @@ class LectureContentService {
     );
 
     try {
-      // 2. Update both the storage pointer and the displayed file name.
       await _supabase
           .from('lecture_files')
           .update({
@@ -263,7 +275,6 @@ class LectureContentService {
           })
           .eq('id', file.id);
 
-      // 3. Verify both values using a normal SELECT.
       final verification = await _supabase
           .from('lecture_files')
           .select('id, file_url, title')
@@ -285,21 +296,16 @@ class LectureContentService {
         );
       }
     } catch (e) {
-      // The database must remain on the old object if anything above fails.
       try {
         await _supabase.storage.from(bucket).remove([newPath]);
       } catch (_) {}
       rethrow;
     }
 
-    // 4. The DB now points to the new object, so it is safe to remove the old
-    // object. Cleanup failure must not undo a successful replacement.
     if (oldPath.isNotEmpty && oldPath != newPath) {
       try {
         await _supabase.storage.from(bucket).remove([oldPath]);
-      } catch (_) {
-        // Keep the replacement valid even if old-file cleanup fails.
-      }
+      } catch (_) {}
     }
   }
 
