@@ -19,7 +19,8 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
   final LectureContentService _files = LectureContentService();
 
   late Future<_Data> _future;
-  bool _busy = false;
+  bool _addingFile = false;
+  final Set<String> _busyFileIds = <String>{};
 
   @override
   void initState() {
@@ -162,7 +163,11 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
       }
 
       if (!mounted) return;
-      _message(lecture == null ? 'Lecture added successfully.' : 'Lecture updated successfully.');
+      _message(
+        lecture == null
+            ? 'Lecture added successfully.'
+            : 'Lecture updated successfully.',
+      );
       await _refresh();
     } catch (e) {
       if (mounted) _message('Error: $e', error: true);
@@ -174,12 +179,12 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
   }
 
   Future<void> _addFile(AdminLecture lecture, String type) async {
-    if (_busy) return;
+    if (_addingFile) return;
 
     final extensions = _extensionsForType(type);
 
     setState(() {
-      _busy = true;
+      _addingFile = true;
     });
 
     try {
@@ -259,21 +264,21 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
     } finally {
       if (mounted) {
         setState(() {
-          _busy = false;
+          _addingFile = false;
         });
       }
     }
   }
 
   Future<void> _replaceFile(LectureFileItem file) async {
-    if (_busy) return;
+    if (_busyFileIds.contains(file.id)) return;
 
-    final extensions = _extensionsForType(file.fileType);
     setState(() {
-      _busy = true;
+      _busyFileIds.add(file.id);
     });
 
     try {
+      final extensions = _extensionsForType(file.fileType);
       final picked = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: extensions,
@@ -325,7 +330,7 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
     } finally {
       if (mounted) {
         setState(() {
-          _busy = false;
+          _busyFileIds.remove(file.id);
         });
       }
     }
@@ -345,11 +350,15 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
   }
 
   Future<void> _deleteFile(LectureFileItem file) async {
+    if (_busyFileIds.contains(file.id)) return;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete File'),
-        content: Text('Delete "${file.title}"? This will remove the storage file too.'),
+        content: Text(
+          'Delete "${file.title}"? This will remove the storage file too.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
@@ -365,6 +374,10 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
 
     if (!mounted || confirmed != true) return;
 
+    setState(() {
+      _busyFileIds.add(file.id);
+    });
+
     try {
       await _files.deleteLectureFile(file: file);
       if (!mounted) return;
@@ -372,6 +385,12 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
       await _refresh();
     } catch (e) {
       if (mounted) _message('Delete failed: $e', error: true);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busyFileIds.remove(file.id);
+        });
+      }
     }
   }
 
@@ -489,7 +508,7 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
                       ),
                       const SizedBox(width: 8),
                       FilledButton.icon(
-                        onPressed: _busy ? null : () => _editLecture(),
+                        onPressed: () => _editLecture(),
                         icon: const Icon(Icons.add_rounded),
                         label: const Text('Add Lecture'),
                       ),
@@ -537,7 +556,8 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
                             onOpenFile: _openFile,
                             onReplaceFile: _replaceFile,
                             onDeleteFile: _deleteFile,
-                            busy: _busy,
+                            addingFile: _addingFile,
+                            busyFileIds: _busyFileIds,
                           );
                         },
                       ),
@@ -561,7 +581,8 @@ class _LectureExpansion extends StatefulWidget {
   final Future<void> Function(LectureFileItem) onOpenFile;
   final Future<void> Function(LectureFileItem) onReplaceFile;
   final Future<void> Function(LectureFileItem) onDeleteFile;
-  final bool busy;
+  final bool addingFile;
+  final Set<String> busyFileIds;
 
   const _LectureExpansion({
     required this.lecture,
@@ -574,7 +595,8 @@ class _LectureExpansion extends StatefulWidget {
     required this.onOpenFile,
     required this.onReplaceFile,
     required this.onDeleteFile,
-    required this.busy,
+    required this.addingFile,
+    required this.busyFileIds,
   });
 
   @override
@@ -678,17 +700,23 @@ class _LectureExpansionState extends State<_LectureExpansion> {
                     runSpacing: 8,
                     children: [
                       OutlinedButton.icon(
-                        onPressed: widget.busy ? null : () => widget.onAddFile('pdf'),
+                        onPressed: widget.addingFile
+                            ? null
+                            : () => widget.onAddFile('pdf'),
                         icon: const Icon(Icons.picture_as_pdf_rounded),
                         label: const Text('Add PDF'),
                       ),
                       OutlinedButton.icon(
-                        onPressed: widget.busy ? null : () => widget.onAddFile('audio'),
+                        onPressed: widget.addingFile
+                            ? null
+                            : () => widget.onAddFile('audio'),
                         icon: const Icon(Icons.audio_file_rounded),
                         label: const Text('Add Audio'),
                       ),
                       OutlinedButton.icon(
-                        onPressed: widget.busy ? null : () => widget.onAddFile('video'),
+                        onPressed: widget.addingFile
+                            ? null
+                            : () => widget.onAddFile('video'),
                         icon: const Icon(Icons.video_file_rounded),
                         label: const Text('Add Video'),
                       ),
@@ -739,55 +767,73 @@ class _LectureExpansionState extends State<_LectureExpansion> {
                     )
                   else
                     ...widget.files.map(
-                      (file) => Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(color: scheme.outlineVariant),
-                            borderRadius: BorderRadius.circular(12),
+                      (file) {
+                        final fileBusy = widget.busyFileIds.contains(file.id);
+
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(color: scheme.outlineVariant),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: ListTile(
+                              leading: fileBusy
+                                  ? const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    )
+                                  : Icon(
+                                      widget.fileIcon(file.fileType),
+                                      color: scheme.primary,
+                                    ),
+                              title: Text(
+                                file.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: Text(
+                                '${file.fileType.toUpperCase()} • order ${file.displayOrder} • ${file.isActive ? 'Active' : 'Inactive'}',
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    tooltip: 'Open',
+                                    onPressed: fileBusy
+                                        ? null
+                                        : () => widget.onOpenFile(file),
+                                    icon: const Icon(Icons.open_in_new_rounded),
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Replace / Switch File',
+                                    onPressed: fileBusy
+                                        ? null
+                                        : () => widget.onReplaceFile(file),
+                                    icon: fileBusy
+                                        ? const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                        : const Icon(Icons.swap_horiz_rounded),
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Delete',
+                                    onPressed: fileBusy
+                                        ? null
+                                        : () => widget.onDeleteFile(file),
+                                    icon: const Icon(Icons.delete_outline_rounded),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                          child: ListTile(
-                            leading: Icon(
-                              widget.fileIcon(file.fileType),
-                              color: scheme.primary,
-                            ),
-                            title: Text(
-                              file.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            subtitle: Text(
-                              '${file.fileType.toUpperCase()} • order ${file.displayOrder} • ${file.isActive ? 'Active' : 'Inactive'}',
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  tooltip: 'Open',
-                                  onPressed: widget.busy
-                                      ? null
-                                      : () => widget.onOpenFile(file),
-                                  icon: const Icon(Icons.open_in_new_rounded),
-                                ),
-                                IconButton(
-                                  tooltip: 'Replace / Switch File',
-                                  onPressed: widget.busy
-                                      ? null
-                                      : () => widget.onReplaceFile(file),
-                                  icon: const Icon(Icons.swap_horiz_rounded),
-                                ),
-                                IconButton(
-                                  tooltip: 'Delete',
-                                  onPressed: widget.busy
-                                      ? null
-                                      : () => widget.onDeleteFile(file),
-                                  icon: const Icon(Icons.delete_outline_rounded),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
                 ],
               ),
