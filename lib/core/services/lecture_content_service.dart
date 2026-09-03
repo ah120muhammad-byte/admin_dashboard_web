@@ -224,6 +224,16 @@ class LectureContentService {
     return 1;
   }
 
+  /// Replaces the storage object behind an existing lecture_files row.
+  ///
+  /// The order is intentionally:
+  ///   1. Upload the new object.
+  ///   2. Switch the DB row to the new object.
+  ///   3. Verify the DB row actually contains the new path.
+  ///   4. Only then delete the old object.
+  ///
+  /// If the DB update fails, the newly uploaded object is removed so we never
+  /// leave an orphaned replacement file behind.
   Future<void> replaceLectureFile({
     required LectureFileItem file,
     required List<int> bytes,
@@ -236,7 +246,7 @@ class LectureContentService {
         '${file.lectureId}/${DateTime.now().microsecondsSinceEpoch}_$safeFileName';
     final uploadBytes = bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
 
-    // 1) Upload the new object first.
+    // 1. Upload the replacement first. Never overwrite the old object.
     await _supabase.storage.from(bucket).uploadBinary(
       newPath,
       uploadBytes,
@@ -244,41 +254,52 @@ class LectureContentService {
     );
 
     try {
-      // 2) Update the database row and require an actual returned row.
-      final updated = await _supabase
+      // 2. Update only the database pointer. Do not use RETURNING here; a
+      // successful PATCH is enough and avoids coupling Replace to a SELECT
+      // policy on the returned row.
+      await _supabase
           .from('lecture_files')
           .update({
             'file_url': newPath,
             'updated_at': DateTime.now().toUtc().toIso8601String(),
           })
-          .eq('id', file.id)
+          .eq('id', file.id);
+
+      // 3. Verify using a normal SELECT. This gives us a clear error if RLS
+      // or another database rule prevented the row from being changed.
+      final verification = await _supabase
+          .from('lecture_files')
           .select('id, file_url')
+          .eq('id', file.id)
           .maybeSingle();
 
-      if (updated == null) {
+      if (verification == null) {
         throw Exception(
-          'The file record was not updated. Check lecture_files update permissions (RLS).',
+          'The lecture file record could not be found after replacement.',
         );
       }
 
-      final savedPath = updated['file_url']?.toString();
+      final savedPath = verification['file_url']?.toString();
       if (savedPath != newPath) {
-        throw Exception('The new file path was not saved to the database.');
+        throw Exception(
+          'The new file was uploaded, but the lecture file record was not switched to it.',
+        );
       }
     } catch (e) {
-      // The DB was not switched, so clean up the new object.
+      // The database must remain on the old object if anything above fails.
       try {
         await _supabase.storage.from(bucket).remove([newPath]);
       } catch (_) {}
       rethrow;
     }
 
-    // 3) Remove the old object only after the DB points to the new one.
+    // 4. The DB now points to the new object, so it is safe to remove the old
+    // object. Cleanup failure must not undo a successful replacement.
     if (oldPath.isNotEmpty && oldPath != newPath) {
       try {
         await _supabase.storage.from(bucket).remove([oldPath]);
       } catch (_) {
-        // Keep the database pointing to the valid new object even if cleanup fails.
+        // Keep the replacement valid even if old-file cleanup fails.
       }
     }
   }
