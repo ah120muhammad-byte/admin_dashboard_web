@@ -20,7 +20,9 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
 
   late Future<_Data> _future;
   bool _addingFile = false;
+  bool _reorderingLectures = false;
   final Set<String> _busyFileIds = <String>{};
+  final Set<String> _reorderingFileLectureIds = <String>{};
 
   @override
   void initState() {
@@ -50,6 +52,120 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
       _future = future;
     });
     await future;
+  }
+
+  void _setLocalData(_Data data) {
+    setState(() {
+      _future = Future<_Data>.value(data);
+    });
+  }
+
+  Future<void> _reorderLectures(
+    _Data data,
+    int oldIndex,
+    int newIndex,
+  ) async {
+    if (_reorderingLectures) return;
+
+    final reordered = List<AdminLecture>.from(data.lectures);
+    if (oldIndex < newIndex) newIndex -= 1;
+    final item = reordered.removeAt(oldIndex);
+    reordered.insert(newIndex, item);
+
+    final previousOrders = <String, int>{
+      for (final lecture in data.lectures) lecture.id: lecture.displayOrder,
+    };
+
+    final normalized = reordered.asMap().entries.map((entry) {
+      final lecture = entry.value;
+      return lecture.copyWith(displayOrder: entry.key + 1);
+    }).toList();
+
+    _setLocalData(_Data(lectures: normalized, files: data.files));
+
+    setState(() {
+      _reorderingLectures = true;
+    });
+
+    try {
+      await _lectures.reorderLectures(
+        lectureIds: normalized.map((lecture) => lecture.id).toList(),
+      );
+      if (!mounted) return;
+      _message('Lecture order saved successfully.');
+    } catch (e) {
+      if (!mounted) return;
+      final restored = data.lectures.map((lecture) {
+        return lecture.copyWith(displayOrder: previousOrders[lecture.id]);
+      }).toList();
+      _setLocalData(_Data(lectures: restored, files: data.files));
+      _message('Unable to save lecture order: $e', error: true);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _reorderingLectures = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _reorderFiles(
+    _Data data,
+    AdminLecture lecture,
+    List<LectureFileItem> currentFiles,
+    int oldIndex,
+    int newIndex,
+  ) async {
+    if (_reorderingFileLectureIds.contains(lecture.id)) return;
+
+    final reordered = List<LectureFileItem>.from(currentFiles);
+    if (oldIndex < newIndex) newIndex -= 1;
+    final item = reordered.removeAt(oldIndex);
+    reordered.insert(newIndex, item);
+
+    final previousOrders = <String, int>{
+      for (final file in currentFiles) file.id: file.displayOrder,
+    };
+
+    final normalized = reordered.asMap().entries.map((entry) {
+      final file = entry.value;
+      return file.copyWith(displayOrder: entry.key + 1);
+    }).toList();
+
+    final updatedFiles = data.files.map((file) {
+      final updated = normalized.where((item) => item.id == file.id).firstOrNull;
+      return updated ?? file;
+    }).toList();
+
+    _setLocalData(_Data(lectures: data.lectures, files: updatedFiles));
+
+    setState(() {
+      _reorderingFileLectureIds.add(lecture.id);
+    });
+
+    try {
+      await _files.reorderLectureFiles(
+        fileIds: normalized.map((file) => file.id).toList(),
+      );
+      if (!mounted) return;
+      _message('File order saved successfully.');
+    } catch (e) {
+      if (!mounted) return;
+      final restoredFiles = data.files.map((file) {
+        final previous = previousOrders[file.id];
+        return previous == null
+            ? file
+            : file.copyWith(displayOrder: previous);
+      }).toList();
+      _setLocalData(_Data(lectures: data.lectures, files: restoredFiles));
+      _message('Unable to save file order: $e', error: true);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _reorderingFileLectureIds.remove(lecture.id);
+        });
+      }
+    }
   }
 
   List<String> _extensionsForType(String type) {
@@ -501,6 +617,15 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
                           ],
                         ),
                       ),
+                      if (_reorderingLectures)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 12),
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
                       IconButton(
                         tooltip: 'Refresh',
                         onPressed: _refresh,
@@ -534,10 +659,14 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
                   ? const _Empty()
                   : RefreshIndicator(
                       onRefresh: _refresh,
-                      child: ListView.separated(
+                      child: ReorderableListView.builder(
                         padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
                         itemCount: data.lectures.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 12),
+                        buildDefaultDragHandles: false,
+                        onReorder: _reorderingLectures
+                            ? (_, _) {}
+                            : (oldIndex, newIndex) =>
+                                _reorderLectures(data, oldIndex, newIndex),
                         itemBuilder: (context, index) {
                           final lecture = data.lectures[index];
                           final files = data.files
@@ -545,19 +674,30 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
                               .toList()
                             ..sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
 
-                          return _LectureExpansion(
-                            lecture: lecture,
-                            files: files,
-                            fileIcon: _fileIcon,
-                            onEdit: () => _editLecture(lecture: lecture),
-                            onPublish: () => _toggleLecture(lecture, true),
-                            onActive: () => _toggleLecture(lecture, false),
-                            onAddFile: (type) => _addFile(lecture, type),
-                            onOpenFile: _openFile,
-                            onReplaceFile: _replaceFile,
-                            onDeleteFile: _deleteFile,
-                            addingFile: _addingFile,
-                            busyFileIds: _busyFileIds,
+                          return Padding(
+                            key: ValueKey(lecture.id),
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _LectureExpansion(
+                              lecture: lecture,
+                              files: files,
+                              fileIcon: _fileIcon,
+                              dragHandle: ReorderableDragStartListener(
+                                index: index,
+                                child: const Icon(Icons.drag_indicator_rounded),
+                              ),
+                              onEdit: () => _editLecture(lecture: lecture),
+                              onPublish: () => _toggleLecture(lecture, true),
+                              onActive: () => _toggleLecture(lecture, false),
+                              onAddFile: (type) => _addFile(lecture, type),
+                              onOpenFile: _openFile,
+                              onReplaceFile: _replaceFile,
+                              onDeleteFile: _deleteFile,
+                              onReorderFiles: (oldIndex, newIndex) =>
+                                  _reorderFiles(data, lecture, files, oldIndex, newIndex),
+                              addingFile: _addingFile,
+                              busyFileIds: _busyFileIds,
+                              reorderingFiles: _reorderingFileLectureIds.contains(lecture.id),
+                            ),
                           );
                         },
                       ),
@@ -574,6 +714,7 @@ class _LectureExpansion extends StatefulWidget {
   final AdminLecture lecture;
   final List<LectureFileItem> files;
   final IconData Function(String) fileIcon;
+  final Widget dragHandle;
   final VoidCallback onEdit;
   final VoidCallback onPublish;
   final VoidCallback onActive;
@@ -581,13 +722,16 @@ class _LectureExpansion extends StatefulWidget {
   final Future<void> Function(LectureFileItem) onOpenFile;
   final Future<void> Function(LectureFileItem) onReplaceFile;
   final Future<void> Function(LectureFileItem) onDeleteFile;
+  final Future<void> Function(int oldIndex, int newIndex) onReorderFiles;
   final bool addingFile;
   final Set<String> busyFileIds;
+  final bool reorderingFiles;
 
   const _LectureExpansion({
     required this.lecture,
     required this.files,
     required this.fileIcon,
+    required this.dragHandle,
     required this.onEdit,
     required this.onPublish,
     required this.onActive,
@@ -595,8 +739,10 @@ class _LectureExpansion extends StatefulWidget {
     required this.onOpenFile,
     required this.onReplaceFile,
     required this.onDeleteFile,
+    required this.onReorderFiles,
     required this.addingFile,
     required this.busyFileIds,
+    required this.reorderingFiles,
   });
 
   @override
@@ -629,13 +775,20 @@ class _LectureExpansionState extends State<_LectureExpansion> {
                   horizontal: 18,
                   vertical: 6,
                 ),
-                leading: CircleAvatar(
-                  backgroundColor: scheme.primaryContainer,
-                  foregroundColor: scheme.primary,
-                  child: Text(
-                    '${widget.lecture.displayOrder}',
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
+                leading: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    widget.dragHandle,
+                    const SizedBox(width: 8),
+                    CircleAvatar(
+                      backgroundColor: scheme.primaryContainer,
+                      foregroundColor: scheme.primary,
+                      child: Text(
+                        '${widget.lecture.displayOrder}',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
                 ),
                 title: Text(
                   widget.lecture.title,
@@ -766,11 +919,20 @@ class _LectureExpansionState extends State<_LectureExpansion> {
                       ),
                     )
                   else
-                    ...widget.files.map(
-                      (file) {
+                    ReorderableListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: widget.files.length,
+                      buildDefaultDragHandles: false,
+                      onReorder: widget.reorderingFiles
+                          ? (_, _) {}
+                          : widget.onReorderFiles,
+                      itemBuilder: (context, index) {
+                        final file = widget.files[index];
                         final fileBusy = widget.busyFileIds.contains(file.id);
 
                         return Padding(
+                          key: ValueKey(file.id),
                           padding: const EdgeInsets.only(bottom: 8),
                           child: Container(
                             decoration: BoxDecoration(
@@ -778,16 +940,26 @@ class _LectureExpansionState extends State<_LectureExpansion> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: ListTile(
-                              leading: fileBusy
-                                  ? const SizedBox(
-                                      width: 24,
-                                      height: 24,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
-                                    )
-                                  : Icon(
-                                      widget.fileIcon(file.fileType),
-                                      color: scheme.primary,
-                                    ),
+                              leading: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  ReorderableDragStartListener(
+                                    index: index,
+                                    child: const Icon(Icons.drag_indicator_rounded),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  fileBusy
+                                      ? const SizedBox(
+                                          width: 24,
+                                          height: 24,
+                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                        )
+                                      : Icon(
+                                          widget.fileIcon(file.fileType),
+                                          color: scheme.primary,
+                                        ),
+                                ],
+                              ),
                               title: Text(
                                 file.title,
                                 maxLines: 1,
@@ -834,6 +1006,22 @@ class _LectureExpansionState extends State<_LectureExpansion> {
                           ),
                         );
                       },
+                    ),
+                  if (widget.reorderingFiles)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          SizedBox(width: 8),
+                          Text('Saving file order...'),
+                        ],
+                      ),
                     ),
                 ],
               ),
