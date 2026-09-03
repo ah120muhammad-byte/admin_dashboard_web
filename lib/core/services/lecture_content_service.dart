@@ -224,16 +224,14 @@ class LectureContentService {
     return 1;
   }
 
-  /// Replaces the storage object behind an existing lecture_files row.
+  /// Replaces the storage object and the displayed title behind an existing
+  /// lecture_files row.
   ///
   /// The order is intentionally:
   ///   1. Upload the new object.
-  ///   2. Switch the DB row to the new object.
-  ///   3. Verify the DB row actually contains the new path.
+  ///   2. Switch the DB row to the new object and its filename-derived title.
+  ///   3. Verify the DB row actually contains both new values.
   ///   4. Only then delete the old object.
-  ///
-  /// If the DB update fails, the newly uploaded object is removed so we never
-  /// leave an orphaned replacement file behind.
   Future<void> replaceLectureFile({
     required LectureFileItem file,
     required List<int> bytes,
@@ -244,6 +242,7 @@ class LectureContentService {
     final safeFileName = _sanitizeFileName(newFileName);
     final newPath =
         '${file.lectureId}/${DateTime.now().microsecondsSinceEpoch}_$safeFileName';
+    final newTitle = _titleFromFileName(newFileName);
     final uploadBytes = bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
 
     // 1. Upload the replacement first. Never overwrite the old object.
@@ -254,22 +253,20 @@ class LectureContentService {
     );
 
     try {
-      // 2. Update only the database pointer. Do not use RETURNING here; a
-      // successful PATCH is enough and avoids coupling Replace to a SELECT
-      // policy on the returned row.
+      // 2. Update both the storage pointer and the displayed file name.
       await _supabase
           .from('lecture_files')
           .update({
             'file_url': newPath,
+            'title': newTitle,
             'updated_at': DateTime.now().toUtc().toIso8601String(),
           })
           .eq('id', file.id);
 
-      // 3. Verify using a normal SELECT. This gives us a clear error if RLS
-      // or another database rule prevented the row from being changed.
+      // 3. Verify both values using a normal SELECT.
       final verification = await _supabase
           .from('lecture_files')
-          .select('id, file_url')
+          .select('id, file_url, title')
           .eq('id', file.id)
           .maybeSingle();
 
@@ -280,9 +277,11 @@ class LectureContentService {
       }
 
       final savedPath = verification['file_url']?.toString();
-      if (savedPath != newPath) {
+      final savedTitle = verification['title']?.toString();
+
+      if (savedPath != newPath || savedTitle != newTitle) {
         throw Exception(
-          'The new file was uploaded, but the lecture file record was not switched to it.',
+          'The replacement was uploaded, but the lecture file record was not updated correctly.',
         );
       }
     } catch (e) {
@@ -330,6 +329,12 @@ class LectureContentService {
     }
 
     await _supabase.from('lecture_files').delete().eq('id', file.id);
+  }
+
+  String _titleFromFileName(String fileName) {
+    final name = fileName.trim();
+    if (name.isEmpty) return 'file';
+    return name.replaceFirst(RegExp(r'\.[^.]+$'), '');
   }
 
   String _sanitizeFileName(String fileName) {
