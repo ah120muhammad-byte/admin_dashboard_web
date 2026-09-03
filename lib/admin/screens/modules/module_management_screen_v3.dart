@@ -54,12 +54,6 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
     await future;
   }
 
-  void _setLocalData(_Data data) {
-    setState(() {
-      _future = Future<_Data>.value(data);
-    });
-  }
-
   Future<void> _reorderLectures(
     _Data data,
     int oldIndex,
@@ -72,34 +66,24 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
     final item = reordered.removeAt(oldIndex);
     reordered.insert(newIndex, item);
 
-    final previousOrders = <String, int>{
-      for (final lecture in data.lectures) lecture.id: lecture.displayOrder,
-    };
-
-    final normalized = reordered.asMap().entries.map((entry) {
-      final lecture = entry.value;
-      return lecture.copyWith(displayOrder: entry.key + 1);
-    }).toList();
-
-    _setLocalData(_Data(lectures: normalized, files: data.files));
-
     setState(() {
       _reorderingLectures = true;
+      _future = Future<_Data>.value(
+        _Data(lectures: reordered, files: data.files),
+      );
     });
 
     try {
       await _lectures.reorderLectures(
-        lectureIds: normalized.map((lecture) => lecture.id).toList(),
+        lectureIds: reordered.map((lecture) => lecture.id).toList(),
       );
       if (!mounted) return;
       _message('Lecture order saved successfully.');
+      await _refresh();
     } catch (e) {
       if (!mounted) return;
-      final restored = data.lectures.map((lecture) {
-        return lecture.copyWith(displayOrder: previousOrders[lecture.id]);
-      }).toList();
-      _setLocalData(_Data(lectures: restored, files: data.files));
       _message('Unable to save lecture order: $e', error: true);
+      await _refresh();
     } finally {
       if (mounted) {
         setState(() {
@@ -123,42 +107,31 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
     final item = reordered.removeAt(oldIndex);
     reordered.insert(newIndex, item);
 
-    final previousOrders = <String, int>{
-      for (final file in currentFiles) file.id: file.displayOrder,
-    };
-
-    final normalized = reordered.asMap().entries.map((entry) {
-      final file = entry.value;
-      return file.copyWith(displayOrder: entry.key + 1);
-    }).toList();
-
-    final updatedFiles = data.files.map((file) {
-      final updated = normalized.where((item) => item.id == file.id).firstOrNull;
-      return updated ?? file;
-    }).toList();
-
-    _setLocalData(_Data(lectures: data.lectures, files: updatedFiles));
+    final otherFiles = data.files
+        .where((file) => file.lectureId != lecture.id)
+        .toList();
 
     setState(() {
       _reorderingFileLectureIds.add(lecture.id);
+      _future = Future<_Data>.value(
+        _Data(
+          lectures: data.lectures,
+          files: [...otherFiles, ...reordered],
+        ),
+      );
     });
 
     try {
       await _files.reorderLectureFiles(
-        fileIds: normalized.map((file) => file.id).toList(),
+        fileIds: reordered.map((file) => file.id).toList(),
       );
       if (!mounted) return;
       _message('File order saved successfully.');
+      await _refresh();
     } catch (e) {
       if (!mounted) return;
-      final restoredFiles = data.files.map((file) {
-        final previous = previousOrders[file.id];
-        return previous == null
-            ? file
-            : file.copyWith(displayOrder: previous);
-      }).toList();
-      _setLocalData(_Data(lectures: data.lectures, files: restoredFiles));
       _message('Unable to save file order: $e', error: true);
+      await _refresh();
     } finally {
       if (mounted) {
         setState(() {
