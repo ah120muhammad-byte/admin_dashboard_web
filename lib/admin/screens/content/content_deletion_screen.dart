@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/services/academic_levels_service.dart';
 import '../../../core/services/admin_modules_service.dart';
 import '../../../core/services/lectures_service.dart';
+import '../../../core/services/exams_service.dart';
 
 class ContentDeletionScreen extends StatefulWidget {
   const ContentDeletionScreen({super.key});
@@ -15,6 +16,7 @@ class _ContentDeletionScreenState extends State<ContentDeletionScreen> {
   final _levels = AcademicLevelsService();
   final _modules = AdminModulesService();
   final _lectures = LecturesService();
+  final _exams = ExamsService();
   late Future<_Data> _future;
   int _tab = 0;
   String _search = '';
@@ -30,11 +32,13 @@ class _ContentDeletionScreenState extends State<ContentDeletionScreen> {
       _levels.getLevels(),
       _modules.getModules(),
       _lectures.getLectures(),
+      _exams.getExams(),
     ]);
     return _Data(
       levels: result[0] as List<AcademicLevel>,
       modules: result[1] as List<AdminModule>,
       lectures: result[2] as List<AdminLecture>,
+      exams: result[3] as List<AdminExam>,
     );
   }
 
@@ -83,10 +87,12 @@ class _ContentDeletionScreenState extends State<ContentDeletionScreen> {
   }
 
   Future<void> _deleteLevel(AcademicLevel level, _Data data) async {
-    final count = data.modules.where((m) => m.academicLevelId == level.id).length;
+    final moduleCount = data.modules.where((m) => m.academicLevelId == level.id).length;
+    final lectureCount = data.lectures.where((l) => data.modules.any((m) => m.id == l.moduleId && m.academicLevelId == level.id)).length;
+    final examCount = data.exams.where((e) => data.lectures.any((l) => l.id == e.lectureId && data.modules.any((m) => m.id == l.moduleId && m.academicLevelId == level.id))).length;
     final confirmed = await _confirm(
       'Delete Academic Level?',
-      'Delete "${level.name}" permanently? It currently contains $count module(s).',
+      'Delete "${level.name}" permanently? This includes $moduleCount module(s), $lectureCount lecture(s), and $examCount exam(s).',
     );
     if (!confirmed || !mounted) return;
 
@@ -100,10 +106,11 @@ class _ContentDeletionScreenState extends State<ContentDeletionScreen> {
   }
 
   Future<void> _deleteModule(AdminModule module, _Data data) async {
-    final count = data.lectures.where((l) => l.moduleId == module.id).length;
+    final lectureCount = data.lectures.where((l) => l.moduleId == module.id).length;
+    final examCount = data.exams.where((e) => data.lectures.any((l) => l.id == e.lectureId && l.moduleId == module.id)).length;
     final confirmed = await _confirm(
       'Delete Module?',
-      'Delete "${module.name}" permanently? It currently contains $count lecture(s).',
+      'Delete "${module.name}" permanently? This includes $lectureCount lecture(s) and $examCount exam(s).',
     );
     if (!confirmed || !mounted) return;
 
@@ -116,10 +123,11 @@ class _ContentDeletionScreenState extends State<ContentDeletionScreen> {
     }
   }
 
-  Future<void> _deleteLecture(AdminLecture lecture) async {
+  Future<void> _deleteLecture(AdminLecture lecture, _Data data) async {
+    final examCount = data.exams.where((e) => e.lectureId == lecture.id).length;
     final confirmed = await _confirm(
       'Delete Lecture?',
-      'Delete "${lecture.title}" permanently and remove its uploaded files from storage?',
+      'Delete "${lecture.title}" permanently and remove its uploaded files from storage? This will also remove $examCount exam(s) linked to this lecture.',
     );
     if (!confirmed || !mounted) return;
 
@@ -127,6 +135,22 @@ class _ContentDeletionScreenState extends State<ContentDeletionScreen> {
       await _lectures.deleteLecture(lecture.id);
       await _refresh();
       if (mounted) _message('Lecture deleted.');
+    } catch (e) {
+      if (mounted) _message('Delete failed: $e', error: true);
+    }
+  }
+
+  Future<void> _deleteExam(AdminExam exam) async {
+    final confirmed = await _confirm(
+      'Delete Exam?',
+      'Delete "${exam.title}" permanently? Its questions, attempts, answers, and related exam data will also be removed by the database cascade.',
+    );
+    if (!confirmed || !mounted) return;
+
+    try {
+      await _exams.deleteExam(exam.id);
+      await _refresh();
+      if (mounted) _message('Exam deleted.');
     } catch (e) {
       if (mounted) _message('Delete failed: $e', error: true);
     }
@@ -171,7 +195,7 @@ class _ContentDeletionScreenState extends State<ContentDeletionScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Permanently delete academic levels, modules and lectures.',
+                              'Permanently delete academic levels, modules, lectures and exams.',
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,
                               ),
@@ -203,6 +227,11 @@ class _ContentDeletionScreenState extends State<ContentDeletionScreen> {
                         value: 2,
                         icon: const Icon(Icons.video_library_outlined),
                         label: Text('Lectures (${data.lectures.length})'),
+                      ),
+                      ButtonSegment(
+                        value: 3,
+                        icon: const Icon(Icons.quiz_outlined),
+                        label: Text('Exams (${data.exams.length})'),
                       ),
                     ],
                     selected: {_tab},
@@ -256,7 +285,8 @@ class _ContentDeletionScreenState extends State<ContentDeletionScreen> {
           .where((x) => _search.isEmpty || x.name.toLowerCase().contains(_search))
           .toList();
       return _itemsList(items, (module) {
-        final count = data.lectures.where((l) => l.moduleId == module.id).length;
+        final lectureCount = data.lectures.where((l) => l.moduleId == module.id).length;
+        final examCount = data.exams.where((e) => data.lectures.any((l) => l.id == e.lectureId && l.moduleId == module.id)).length;
         String levelName = 'Unknown Level';
         for (final level in data.levels) {
           if (level.id == module.academicLevelId) {
@@ -267,23 +297,47 @@ class _ContentDeletionScreenState extends State<ContentDeletionScreen> {
         return ListTile(
           leading: const CircleAvatar(child: Icon(Icons.menu_book_outlined)),
           title: Text(module.name),
-          subtitle: Text('$levelName • $count lecture(s)'),
+          subtitle: Text('$levelName • $lectureCount lecture(s) • $examCount exam(s)'),
           trailing: _deleteButton(() => _deleteModule(module, data)),
         );
       });
     }
 
-    final items = data.lectures
-        .where((x) => _search.isEmpty || x.title.toLowerCase().contains(_search))
-        .toList();
-    return _itemsList(items, (lecture) {
+    if (_tab == 2) {
+      final items = data.lectures
+          .where((x) => _search.isEmpty || x.title.toLowerCase().contains(_search))
+          .toList();
+      return _itemsList(items, (lecture) {
+        final examCount = data.exams.where((e) => e.lectureId == lecture.id).length;
+        return ListTile(
+          leading: const CircleAvatar(child: Icon(Icons.video_library_outlined)),
+          title: Text(lecture.title),
+          subtitle: Text('${lecture.isPublished ? 'Published' : 'Draft'} • ${lecture.isActive ? 'Active' : 'Inactive'} • $examCount exam(s)'),
+          trailing: _deleteButton(() => _deleteLecture(lecture, data)),
+        );
+      });
+    }
+
+    final items = data.exams.where((x) {
+      if (_search.isEmpty) return true;
+      final lecture = data.lectures.where((l) => l.id == x.lectureId).firstOrNull;
+      return x.title.toLowerCase().contains(_search) ||
+          (x.description ?? '').toLowerCase().contains(_search) ||
+          (lecture?.title.toLowerCase().contains(_search) ?? false);
+    }).toList();
+    return _itemsList(items, (exam) {
+      String lectureTitle = 'Unknown Lecture';
+      for (final lecture in data.lectures) {
+        if (lecture.id == exam.lectureId) {
+          lectureTitle = lecture.title;
+          break;
+        }
+      }
       return ListTile(
-        leading: const CircleAvatar(child: Icon(Icons.video_library_outlined)),
-        title: Text(lecture.title),
-        subtitle: Text(
-          '${lecture.isPublished ? 'Published' : 'Draft'} • ${lecture.isActive ? 'Active' : 'Inactive'}',
-        ),
-        trailing: _deleteButton(() => _deleteLecture(lecture)),
+        leading: const CircleAvatar(child: Icon(Icons.quiz_outlined)),
+        title: Text(exam.title),
+        subtitle: Text('$lectureTitle • ${exam.durationMinutes} min • Pass ${exam.passingScore}% • ${exam.isActive ? 'Active' : 'Inactive'}'),
+        trailing: _deleteButton(() => _deleteExam(exam)),
       );
     });
   }
@@ -317,10 +371,12 @@ class _Data {
   final List<AcademicLevel> levels;
   final List<AdminModule> modules;
   final List<AdminLecture> lectures;
+  final List<AdminExam> exams;
 
   const _Data({
     required this.levels,
     required this.modules,
     required this.lectures,
+    required this.exams,
   });
 }
