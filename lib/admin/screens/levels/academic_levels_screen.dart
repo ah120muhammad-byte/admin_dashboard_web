@@ -55,21 +55,34 @@ class _AcademicLevelsScreenState extends State<AcademicLevelsScreen> {
                     children: [
                       TextFormField(
                         controller: nameController,
-                        decoration: const InputDecoration(labelText: 'Name', border: OutlineInputBorder()),
-                        validator: (value) => value == null || value.trim().isEmpty ? 'Name is required' : null,
+                        decoration: const InputDecoration(
+                          labelText: 'Name',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) => value == null || value.trim().isEmpty
+                            ? 'Name is required'
+                            : null,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: descriptionController,
                         maxLines: 3,
-                        decoration: const InputDecoration(labelText: 'Description', border: OutlineInputBorder()),
+                        decoration: const InputDecoration(
+                          labelText: 'Description',
+                          border: OutlineInputBorder(),
+                        ),
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: orderController,
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Display Order', border: OutlineInputBorder()),
-                        validator: (value) => int.tryParse(value ?? '') == null ? 'Enter a valid number' : null,
+                        decoration: const InputDecoration(
+                          labelText: 'Display Order',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) => int.tryParse(value ?? '') == null
+                            ? 'Enter a valid number'
+                            : null,
                       ),
                       const SizedBox(height: 16),
                       ImageUrlUploadField(
@@ -89,14 +102,19 @@ class _AcademicLevelsScreenState extends State<AcademicLevelsScreen> {
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
               FilledButton(
                 onPressed: () async {
                   if (!formKey.currentState!.validate()) return;
+
                   final name = nameController.text.trim();
                   final description = descriptionController.text.trim();
                   final displayOrder = int.parse(orderController.text.trim());
                   final imageUrl = imageController.text.trim();
+
                   try {
                     if (level == null) {
                       await _service.addLevel(
@@ -116,15 +134,22 @@ class _AcademicLevelsScreenState extends State<AcademicLevelsScreen> {
                         imageUrl: imageUrl.isEmpty ? null : imageUrl,
                       );
                     }
+
                     if (!dialogContext.mounted) return;
                     Navigator.pop(dialogContext);
                     if (!mounted) return;
                     final future = _service.getLevels();
                     setState(() => _levelsFuture = future);
-                    messenger.showSnackBar(SnackBar(content: Text(level == null ? 'Academic level added' : 'Academic level updated')));
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text(level == null ? 'Academic level added' : 'Academic level updated'),
+                      ),
+                    );
                   } catch (e) {
                     if (!dialogContext.mounted) return;
-                    ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text('Error: $e')));
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(
+                      SnackBar(content: Text('Error: $e')),
+                    );
                   }
                 },
                 child: Text(level == null ? 'Add' : 'Save'),
@@ -148,7 +173,11 @@ class _AcademicLevelsScreenState extends State<AcademicLevelsScreen> {
       if (!mounted) return;
       final future = _service.getLevels();
       setState(() => _levelsFuture = future);
-      messenger.showSnackBar(SnackBar(content: Text(level.isActive ? 'Academic level deactivated' : 'Academic level activated')));
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(level.isActive ? 'Academic level deactivated' : 'Academic level activated'),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -161,8 +190,12 @@ class _AcademicLevelsScreenState extends State<AcademicLevelsScreen> {
     return FutureBuilder<List<AcademicLevel>>(
       future: _levelsFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-        if (snapshot.hasError) return _buildErrorState(context, snapshot.error.toString());
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return _buildErrorState(context, snapshot.error.toString());
+        }
         final levels = snapshot.data ?? [];
         return RefreshIndicator(
           onRefresh: _refresh,
@@ -178,16 +211,32 @@ class _AcademicLevelsScreenState extends State<AcademicLevelsScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('Academic Levels', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+                            Text(
+                              'Academic Levels',
+                              style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+                            ),
                             const SizedBox(height: 5),
-                            Text('Manage academic levels, ordering, visibility and images.', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.65))),
+                            Text(
+                              'Manage academic levels, ordering, visibility and images.',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+                              ),
+                            ),
                           ],
                         ),
                       ),
                       const SizedBox(width: 16),
-                      OutlinedButton.icon(onPressed: _refresh, icon: const Icon(Icons.refresh_rounded), label: const Text('Refresh')),
+                      OutlinedButton.icon(
+                        onPressed: _refresh,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Refresh'),
+                      ),
                       const SizedBox(width: 10),
-                      FilledButton.icon(onPressed: () => _showLevelDialog(), icon: const Icon(Icons.add_rounded), label: const Text('Add Level')),
+                      FilledButton.icon(
+                        onPressed: () => _showLevelDialog(),
+                        icon: const Icon(Icons.add_rounded),
+                        label: const Text('Add Level'),
+                      ),
                     ],
                   ),
                 ),
@@ -195,13 +244,20 @@ class _AcademicLevelsScreenState extends State<AcademicLevelsScreen> {
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(28, 24, 28, 32),
                 sliver: levels.isEmpty
-                    ? const SliverFillRemaining(hasScrollBody: false, child: _EmptyLevelsState())
+                    ? const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: _EmptyLevelsState(),
+                      )
                     : SliverList.separated(
                         itemCount: levels.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
                           final level = levels[index];
-                          return _LevelCard(level: level, onEdit: () => _showLevelDialog(level: level), onToggle: () => _toggleActive(level));
+                          return _LevelCard(
+                            level: level,
+                            onEdit: () => _showLevelDialog(level: level),
+                            onToggle: () => _toggleActive(level),
+                          );
                         },
                       ),
               ),
@@ -225,14 +281,21 @@ class _AcademicLevelsScreenState extends State<AcademicLevelsScreen> {
               children: [
                 Icon(Icons.cloud_off_rounded, size: 52, color: theme.colorScheme.error),
                 const SizedBox(height: 14),
-                Text('Unable to load Academic Levels', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                Text(
+                  'Unable to load Academic Levels',
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+                ),
                 const SizedBox(height: 8),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 620),
                   child: SelectableText(error, textAlign: TextAlign.center, style: theme.textTheme.bodySmall),
                 ),
                 const SizedBox(height: 18),
-                FilledButton.icon(onPressed: _refresh, icon: const Icon(Icons.refresh_rounded), label: const Text('Try Again')),
+                FilledButton.icon(
+                  onPressed: _refresh,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Try Again'),
+                ),
               ],
             ),
           ),
@@ -246,7 +309,9 @@ class _LevelCard extends StatelessWidget {
   final AcademicLevel level;
   final VoidCallback onEdit;
   final VoidCallback onToggle;
+
   const _LevelCard({required this.level, required this.onEdit, required this.onToggle});
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -264,27 +329,58 @@ class _LevelCard extends StatelessWidget {
               width: 44,
               height: 44,
               alignment: Alignment.center,
-              decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)),
-              child: Text('${level.displayOrder}', style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w800)),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '${level.displayOrder}',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.primary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
             ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(children: [
-                    Flexible(child: Text(level.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700))),
-                    const SizedBox(width: 10),
-                    _StatusChip(isActive: level.isActive),
-                  ]),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          level.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      _StatusChip(isActive: level.isActive),
+                    ],
+                  ),
                   const SizedBox(height: 6),
-                  Text(level.description?.trim().isNotEmpty == true ? level.description!.trim() : 'No description provided.', maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.62))),
+                  Text(
+                    level.description?.trim().isNotEmpty == true
+                        ? level.description!.trim()
+                        : 'No description provided.',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.62),
+                    ),
+                  ),
                 ],
               ),
             ),
             const SizedBox(width: 16),
             IconButton(tooltip: 'Edit', onPressed: onEdit, icon: const Icon(Icons.edit_outlined)),
-            IconButton(tooltip: level.isActive ? 'Deactivate' : 'Activate', onPressed: onToggle, icon: Icon(level.isActive ? Icons.visibility_off_outlined : Icons.visibility_outlined)),
+            IconButton(
+              tooltip: level.isActive ? 'Deactivate' : 'Activate',
+              onPressed: onToggle,
+              icon: Icon(level.isActive ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+            ),
           ],
         ),
       ),
@@ -295,11 +391,20 @@ class _LevelCard extends StatelessWidget {
 class _LevelThumbnail extends StatelessWidget {
   final String? imageUrl;
   const _LevelThumbnail({required this.imageUrl});
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     if (imageUrl == null || imageUrl!.isEmpty) {
-      return Container(width: 76, height: 76, decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(14)), child: Icon(Icons.school_outlined, color: theme.colorScheme.primary, size: 30));
+      return Container(
+        width: 76,
+        height: 76,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.primary.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Icon(Icons.school_outlined, color: theme.colorScheme.primary, size: 30),
+      );
     }
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
@@ -308,7 +413,12 @@ class _LevelThumbnail extends StatelessWidget {
         width: 76,
         height: 76,
         fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => Container(width: 76, height: 76, color: theme.colorScheme.primary.withValues(alpha: 0.08), child: Icon(Icons.broken_image_outlined, color: theme.colorScheme.primary)),
+        errorBuilder: (_, _, _) => Container(
+          width: 76,
+          height: 76,
+          color: theme.colorScheme.primary.withValues(alpha: 0.08),
+          child: Icon(Icons.broken_image_outlined, color: theme.colorScheme.primary),
+        ),
       ),
     );
   }
@@ -317,20 +427,28 @@ class _LevelThumbnail extends StatelessWidget {
 class _StatusChip extends StatelessWidget {
   final bool isActive;
   const _StatusChip({required this.isActive});
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final color = isActive ? theme.colorScheme.primary : theme.colorScheme.outline;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(20)),
-      child: Text(isActive ? 'Active' : 'Inactive', style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700)),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        isActive ? 'Active' : 'Inactive',
+        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700),
+      ),
     );
   }
 }
 
 class _EmptyLevelsState extends StatelessWidget {
   const _EmptyLevelsState();
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -342,11 +460,22 @@ class _EmptyLevelsState extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.school_outlined, size: 58, color: theme.colorScheme.primary.withValues(alpha: 0.70)),
+              Icon(
+                Icons.school_outlined,
+                size: 58,
+                color: theme.colorScheme.primary.withValues(alpha: 0.70),
+              ),
               const SizedBox(height: 14),
-              Text('No academic levels yet', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              Text(
+                'No academic levels yet',
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 6),
-              Text('Create your first academic level using the button above.', textAlign: TextAlign.center, style: theme.textTheme.bodyMedium),
+              Text(
+                'Create your first academic level using the button above.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium,
+              ),
             ],
           ),
         ),
