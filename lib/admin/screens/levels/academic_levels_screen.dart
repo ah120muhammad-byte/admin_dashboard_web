@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/services/academic_levels_service.dart';
+import '../../widgets/image_url_upload_field.dart';
 
 class AcademicLevelsScreen extends StatefulWidget {
   const AcademicLevelsScreen({super.key});
@@ -11,7 +12,6 @@ class AcademicLevelsScreen extends StatefulWidget {
 
 class _AcademicLevelsScreenState extends State<AcademicLevelsScreen> {
   final AcademicLevelsService _service = AcademicLevelsService();
-
   late Future<List<AcademicLevel>> _levelsFuture;
 
   @override
@@ -26,26 +26,15 @@ class _AcademicLevelsScreenState extends State<AcademicLevelsScreen> {
 
   Future<void> _refresh() async {
     final future = _service.getLevels();
-
-    setState(() {
-      _levelsFuture = future;
-    });
-
+    setState(() => _levelsFuture = future);
     await future;
   }
 
   Future<void> _showLevelDialog({AcademicLevel? level}) async {
     final nameController = TextEditingController(text: level?.name ?? '');
-    final descriptionController = TextEditingController(
-      text: level?.description ?? '',
-    );
-    final orderController = TextEditingController(
-      text: (level?.displayOrder ?? 0).toString(),
-    );
-    final imageController = TextEditingController(
-      text: level?.imageUrl ?? '',
-    );
-
+    final descriptionController = TextEditingController(text: level?.description ?? '');
+    final orderController = TextEditingController(text: (level?.displayOrder ?? 0).toString());
+    final imageController = TextEditingController(text: level?.imageUrl ?? '');
     bool isActive = level?.isActive ?? true;
     final formKey = GlobalKey<FormState>();
     final messenger = ScaffoldMessenger.of(context);
@@ -53,158 +42,96 @@ class _AcademicLevelsScreenState extends State<AcademicLevelsScreen> {
     try {
       await showDialog<void>(
         context: context,
-        builder: (dialogContext) {
-          return StatefulBuilder(
-            builder: (dialogContext, setDialogState) {
-              return AlertDialog(
-                title: Text(
-                  level == null
-                      ? 'Add Academic Level'
-                      : 'Edit Academic Level',
-                ),
-                content: SizedBox(
-                  width: 500,
-                  child: Form(
-                    key: formKey,
-                    child: SingleChildScrollView(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          TextFormField(
-                            controller: nameController,
-                            decoration: const InputDecoration(
-                              labelText: 'Name',
-                              border: OutlineInputBorder(),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.trim().isEmpty) {
-                                return 'Name is required';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            controller: descriptionController,
-                            maxLines: 3,
-                            decoration: const InputDecoration(
-                              labelText: 'Description',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            controller: orderController,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'Display Order',
-                              border: OutlineInputBorder(),
-                            ),
-                            validator: (value) {
-                              final number = int.tryParse(value ?? '');
-                              if (number == null) {
-                                return 'Enter a valid number';
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            controller: imageController,
-                            decoration: const InputDecoration(
-                              labelText: 'Image URL',
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          SwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('Active'),
-                            value: isActive,
-                            onChanged: (value) {
-                              setDialogState(() {
-                                isActive = value;
-                              });
-                            },
-                          ),
-                        ],
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, setDialogState) => AlertDialog(
+            title: Text(level == null ? 'Add Academic Level' : 'Edit Academic Level'),
+            content: SizedBox(
+              width: 500,
+              child: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: nameController,
+                        decoration: const InputDecoration(labelText: 'Name', border: OutlineInputBorder()),
+                        validator: (value) => value == null || value.trim().isEmpty ? 'Name is required' : null,
                       ),
-                    ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: descriptionController,
+                        maxLines: 3,
+                        decoration: const InputDecoration(labelText: 'Description', border: OutlineInputBorder()),
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: orderController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(labelText: 'Display Order', border: OutlineInputBorder()),
+                        validator: (value) => int.tryParse(value ?? '') == null ? 'Enter a valid number' : null,
+                      ),
+                      const SizedBox(height: 16),
+                      ImageUrlUploadField(
+                        controller: imageController,
+                        pathPrefix: 'academic_levels',
+                      ),
+                      const SizedBox(height: 12),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Active'),
+                        value: isActive,
+                        onChanged: (value) => setDialogState(() => isActive = value),
+                      ),
+                    ],
                   ),
                 ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(dialogContext),
-                    child: const Text('Cancel'),
-                  ),
-                  FilledButton(
-                    onPressed: () async {
-                      if (!formKey.currentState!.validate()) {
-                        return;
-                      }
-
-                      final name = nameController.text.trim();
-                      final description = descriptionController.text.trim();
-                      final displayOrder =
-                          int.parse(orderController.text.trim());
-                      final imageUrl = imageController.text.trim();
-
-                      setDialogState(() {});
-
-                      try {
-                        if (level == null) {
-                          await _service.addLevel(
-                            name: name,
-                            description:
-                                description.isEmpty ? null : description,
-                            displayOrder: displayOrder,
-                            isActive: isActive,
-                            imageUrl: imageUrl.isEmpty ? null : imageUrl,
-                          );
-                        } else {
-                          await _service.updateLevel(
-                            id: level.id,
-                            name: name,
-                            description:
-                                description.isEmpty ? null : description,
-                            displayOrder: displayOrder,
-                            isActive: isActive,
-                            imageUrl: imageUrl.isEmpty ? null : imageUrl,
-                          );
-                        }
-
-                        if (!dialogContext.mounted) return;
-                        Navigator.pop(dialogContext);
-
-                        if (!mounted) return;
-                        final future = _service.getLevels();
-                        setState(() {
-                          _levelsFuture = future;
-                        });
-
-                        messenger.showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              level == null
-                                  ? 'Academic level added'
-                                  : 'Academic level updated',
-                            ),
-                          ),
-                        );
-                      } catch (e) {
-                        if (!dialogContext.mounted) return;
-                        ScaffoldMessenger.of(dialogContext).showSnackBar(
-                          SnackBar(content: Text('Error: $e')),
-                        );
-                      }
-                    },
-                    child: Text(level == null ? 'Add' : 'Save'),
-                  ),
-                ],
-              );
-            },
-          );
-        },
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+              FilledButton(
+                onPressed: () async {
+                  if (!formKey.currentState!.validate()) return;
+                  final name = nameController.text.trim();
+                  final description = descriptionController.text.trim();
+                  final displayOrder = int.parse(orderController.text.trim());
+                  final imageUrl = imageController.text.trim();
+                  try {
+                    if (level == null) {
+                      await _service.addLevel(
+                        name: name,
+                        description: description.isEmpty ? null : description,
+                        displayOrder: displayOrder,
+                        isActive: isActive,
+                        imageUrl: imageUrl.isEmpty ? null : imageUrl,
+                      );
+                    } else {
+                      await _service.updateLevel(
+                        id: level.id,
+                        name: name,
+                        description: description.isEmpty ? null : description,
+                        displayOrder: displayOrder,
+                        isActive: isActive,
+                        imageUrl: imageUrl.isEmpty ? null : imageUrl,
+                      );
+                    }
+                    if (!dialogContext.mounted) return;
+                    Navigator.pop(dialogContext);
+                    if (!mounted) return;
+                    final future = _service.getLevels();
+                    setState(() => _levelsFuture = future);
+                    messenger.showSnackBar(SnackBar(content: Text(level == null ? 'Academic level added' : 'Academic level updated')));
+                  } catch (e) {
+                    if (!dialogContext.mounted) return;
+                    ScaffoldMessenger.of(dialogContext).showSnackBar(SnackBar(content: Text('Error: $e')));
+                  }
+                },
+                child: Text(level == null ? 'Add' : 'Save'),
+              ),
+            ],
+          ),
+        ),
       );
     } finally {
       nameController.dispose();
@@ -216,54 +143,27 @@ class _AcademicLevelsScreenState extends State<AcademicLevelsScreen> {
 
   Future<void> _toggleActive(AcademicLevel level) async {
     final messenger = ScaffoldMessenger.of(context);
-
     try {
-      await _service.setActive(
-        id: level.id,
-        isActive: !level.isActive,
-      );
-
+      await _service.setActive(id: level.id, isActive: !level.isActive);
       if (!mounted) return;
-
       final future = _service.getLevels();
-      setState(() {
-        _levelsFuture = future;
-      });
-
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            level.isActive
-                ? 'Academic level deactivated'
-                : 'Academic level activated',
-          ),
-        ),
-      );
+      setState(() => _levelsFuture = future);
+      messenger.showSnackBar(SnackBar(content: Text(level.isActive ? 'Academic level deactivated' : 'Academic level activated')));
     } catch (e) {
       if (!mounted) return;
-      messenger.showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      messenger.showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return FutureBuilder<List<AcademicLevel>>(
       future: _levelsFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (snapshot.hasError) {
-          return _buildErrorState(context, snapshot.error.toString());
-        }
-
+        if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+        if (snapshot.hasError) return _buildErrorState(context, snapshot.error.toString());
         final levels = snapshot.data ?? [];
-
         return RefreshIndicator(
           onRefresh: _refresh,
           child: CustomScrollView(
@@ -278,36 +178,16 @@ class _AcademicLevelsScreenState extends State<AcademicLevelsScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'Academic Levels',
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
+                            Text('Academic Levels', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
                             const SizedBox(height: 5),
-                            Text(
-                              'Manage academic levels, ordering, visibility and images.',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurface.withValues(
-                                  alpha: 0.65,
-                                ),
-                              ),
-                            ),
+                            Text('Manage academic levels, ordering, visibility and images.', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.65))),
                           ],
                         ),
                       ),
                       const SizedBox(width: 16),
-                      OutlinedButton.icon(
-                        onPressed: _refresh,
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: const Text('Refresh'),
-                      ),
+                      OutlinedButton.icon(onPressed: _refresh, icon: const Icon(Icons.refresh_rounded), label: const Text('Refresh')),
                       const SizedBox(width: 10),
-                      FilledButton.icon(
-                        onPressed: () => _showLevelDialog(),
-                        icon: const Icon(Icons.add_rounded),
-                        label: const Text('Add Level'),
-                      ),
+                      FilledButton.icon(onPressed: () => _showLevelDialog(), icon: const Icon(Icons.add_rounded), label: const Text('Add Level')),
                     ],
                   ),
                 ),
@@ -315,20 +195,13 @@ class _AcademicLevelsScreenState extends State<AcademicLevelsScreen> {
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(28, 24, 28, 32),
                 sliver: levels.isEmpty
-                    ? const SliverFillRemaining(
-                        hasScrollBody: false,
-                        child: _EmptyLevelsState(),
-                      )
+                    ? const SliverFillRemaining(hasScrollBody: false, child: _EmptyLevelsState())
                     : SliverList.separated(
                         itemCount: levels.length,
                         separatorBuilder: (_, _) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
                           final level = levels[index];
-                          return _LevelCard(
-                            level: level,
-                            onEdit: () => _showLevelDialog(level: level),
-                            onToggle: () => _toggleActive(level),
-                          );
+                          return _LevelCard(level: level, onEdit: () => _showLevelDialog(level: level), onToggle: () => _toggleActive(level));
                         },
                       ),
               ),
@@ -341,7 +214,6 @@ class _AcademicLevelsScreenState extends State<AcademicLevelsScreen> {
 
   Widget _buildErrorState(BuildContext context, String error) {
     final theme = Theme.of(context);
-
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(28),
@@ -351,33 +223,16 @@ class _AcademicLevelsScreenState extends State<AcademicLevelsScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.cloud_off_rounded,
-                  size: 52,
-                  color: theme.colorScheme.error,
-                ),
+                Icon(Icons.cloud_off_rounded, size: 52, color: theme.colorScheme.error),
                 const SizedBox(height: 14),
-                Text(
-                  'Unable to load Academic Levels',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                Text('Unable to load Academic Levels', style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
                 const SizedBox(height: 8),
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 620),
-                  child: SelectableText(
-                    error,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodySmall,
-                  ),
+                  child: SelectableText(error, textAlign: TextAlign.center, style: theme.textTheme.bodySmall),
                 ),
                 const SizedBox(height: 18),
-                FilledButton.icon(
-                  onPressed: _refresh,
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('Try Again'),
-                ),
+                FilledButton.icon(onPressed: _refresh, icon: const Icon(Icons.refresh_rounded), label: const Text('Try Again')),
               ],
             ),
           ),
@@ -391,18 +246,11 @@ class _LevelCard extends StatelessWidget {
   final AcademicLevel level;
   final VoidCallback onEdit;
   final VoidCallback onToggle;
-
-  const _LevelCard({
-    required this.level,
-    required this.onEdit,
-    required this.onToggle,
-  });
-
+  const _LevelCard({required this.level, required this.onEdit, required this.onToggle});
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final imageUrl = level.imageUrl?.trim();
-
     return Card(
       elevation: 0,
       clipBehavior: Clip.antiAlias,
@@ -416,68 +264,27 @@ class _LevelCard extends StatelessWidget {
               width: 44,
               height: 44,
               alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withValues(alpha: 0.10),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                '${level.displayOrder}',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.primary,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
+              decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(12)),
+              child: Text('${level.displayOrder}', style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.primary, fontWeight: FontWeight.w800)),
             ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          level.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      _StatusChip(isActive: level.isActive),
-                    ],
-                  ),
+                  Row(children: [
+                    Flexible(child: Text(level.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700))),
+                    const SizedBox(width: 10),
+                    _StatusChip(isActive: level.isActive),
+                  ]),
                   const SizedBox(height: 6),
-                  Text(
-                    level.description?.trim().isNotEmpty == true
-                        ? level.description!.trim()
-                        : 'No description provided.',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.62),
-                    ),
-                  ),
+                  Text(level.description?.trim().isNotEmpty == true ? level.description!.trim() : 'No description provided.', maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.62))),
                 ],
               ),
             ),
             const SizedBox(width: 16),
-            IconButton(
-              tooltip: 'Edit',
-              onPressed: onEdit,
-              icon: const Icon(Icons.edit_outlined),
-            ),
-            IconButton(
-              tooltip: level.isActive ? 'Deactivate' : 'Activate',
-              onPressed: onToggle,
-              icon: Icon(
-                level.isActive
-                    ? Icons.visibility_off_outlined
-                    : Icons.visibility_outlined,
-              ),
-            ),
+            IconButton(tooltip: 'Edit', onPressed: onEdit, icon: const Icon(Icons.edit_outlined)),
+            IconButton(tooltip: level.isActive ? 'Deactivate' : 'Activate', onPressed: onToggle, icon: Icon(level.isActive ? Icons.visibility_off_outlined : Icons.visibility_outlined)),
           ],
         ),
       ),
@@ -487,29 +294,13 @@ class _LevelCard extends StatelessWidget {
 
 class _LevelThumbnail extends StatelessWidget {
   final String? imageUrl;
-
   const _LevelThumbnail({required this.imageUrl});
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     if (imageUrl == null || imageUrl!.isEmpty) {
-      return Container(
-        width: 76,
-        height: 76,
-        decoration: BoxDecoration(
-          color: theme.colorScheme.primary.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Icon(
-          Icons.school_outlined,
-          color: theme.colorScheme.primary,
-          size: 30,
-        ),
-      );
+      return Container(width: 76, height: 76, decoration: BoxDecoration(color: theme.colorScheme.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(14)), child: Icon(Icons.school_outlined, color: theme.colorScheme.primary, size: 30));
     }
-
     return ClipRRect(
       borderRadius: BorderRadius.circular(14),
       child: Image.network(
@@ -517,15 +308,7 @@ class _LevelThumbnail extends StatelessWidget {
         width: 76,
         height: 76,
         fit: BoxFit.cover,
-        errorBuilder: (_, _, _) => Container(
-          width: 76,
-          height: 76,
-          color: theme.colorScheme.primary.withValues(alpha: 0.08),
-          child: Icon(
-            Icons.broken_image_outlined,
-            color: theme.colorScheme.primary,
-          ),
-        ),
+        errorBuilder: (_, _, _) => Container(width: 76, height: 76, color: theme.colorScheme.primary.withValues(alpha: 0.08), child: Icon(Icons.broken_image_outlined, color: theme.colorScheme.primary)),
       ),
     );
   }
@@ -533,41 +316,24 @@ class _LevelThumbnail extends StatelessWidget {
 
 class _StatusChip extends StatelessWidget {
   final bool isActive;
-
   const _StatusChip({required this.isActive});
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = isActive
-        ? theme.colorScheme.primary
-        : theme.colorScheme.outline;
-
+    final color = isActive ? theme.colorScheme.primary : theme.colorScheme.outline;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        isActive ? 'Active' : 'Inactive',
-        style: TextStyle(
-          color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
+      decoration: BoxDecoration(color: color.withValues(alpha: 0.10), borderRadius: BorderRadius.circular(20)),
+      child: Text(isActive ? 'Active' : 'Inactive', style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w700)),
     );
   }
 }
 
 class _EmptyLevelsState extends StatelessWidget {
   const _EmptyLevelsState();
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return Center(
       child: Card(
         elevation: 0,
@@ -576,24 +342,11 @@ class _EmptyLevelsState extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.school_outlined,
-                size: 58,
-                color: theme.colorScheme.primary.withValues(alpha: 0.70),
-              ),
+              Icon(Icons.school_outlined, size: 58, color: theme.colorScheme.primary.withValues(alpha: 0.70)),
               const SizedBox(height: 14),
-              Text(
-                'No academic levels yet',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+              Text('No academic levels yet', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
               const SizedBox(height: 6),
-              Text(
-                'Create your first academic level using the button above.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium,
-              ),
+              Text('Create your first academic level using the button above.', textAlign: TextAlign.center, style: theme.textTheme.bodyMedium),
             ],
           ),
         ),
