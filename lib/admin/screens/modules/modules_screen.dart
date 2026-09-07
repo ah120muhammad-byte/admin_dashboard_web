@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/services/admin_modules_service.dart';
+import '../../widgets/image_url_upload_field.dart';
 
 class ModulesScreen extends StatefulWidget {
   const ModulesScreen({super.key});
@@ -35,9 +36,7 @@ class _ModulesScreenState extends State<ModulesScreen> {
   void _onSearchChanged() {
     final value = _searchController.text.trim().toLowerCase();
     if (value == _search) return;
-    setState(() {
-      _search = value;
-    });
+    setState(() => _search = value);
   }
 
   Future<_ModulesPageData> _loadData() async {
@@ -45,7 +44,6 @@ class _ModulesScreenState extends State<ModulesScreen> {
       _service.getModules(),
       _service.getAcademicLevels(),
     ]);
-
     return _ModulesPageData(
       modules: responses[0] as List<AdminModule>,
       levels: responses[1] as List<AcademicLevelOption>,
@@ -54,9 +52,7 @@ class _ModulesScreenState extends State<ModulesScreen> {
 
   Future<void> _refresh() async {
     final future = _loadData();
-    setState(() {
-      _future = future;
-    });
+    setState(() => _future = future);
     await future;
   }
 
@@ -70,15 +66,11 @@ class _ModulesScreenState extends State<ModulesScreen> {
       final matchesStatus = _status == 'All' ||
           (_status == 'Active' && module.isActive) ||
           (_status == 'Inactive' && !module.isActive);
-
       return matchesSearch && matchesLevel && matchesStatus;
     }).toList();
   }
 
-  String _levelName(
-    String levelId,
-    List<AcademicLevelOption> levels,
-  ) {
+  String _levelName(String levelId, List<AcademicLevelOption> levels) {
     for (final level in levels) {
       if (level.id == levelId) return level.name;
     }
@@ -125,17 +117,13 @@ class _ModulesScreenState extends State<ModulesScreen> {
                           prefixIcon: Icon(Icons.school_outlined),
                         ),
                         items: levels
-                            .map(
-                              (level) => DropdownMenuItem<String>(
-                                value: level.id,
-                                child: Text(level.name),
-                              ),
-                            )
+                            .map((level) => DropdownMenuItem<String>(
+                                  value: level.id,
+                                  child: Text(level.name),
+                                ))
                             .toList(),
                         onChanged: (value) {
-                          setDialogState(() {
-                            selectedLevelId = value;
-                          });
+                          setDialogState(() => selectedLevelId = value);
                         },
                         validator: (value) => value == null || value.isEmpty
                             ? 'Academic Level is required'
@@ -177,12 +165,9 @@ class _ModulesScreenState extends State<ModulesScreen> {
                                 : null,
                       ),
                       const SizedBox(height: 16),
-                      TextFormField(
+                      ImageUrlUploadField(
                         controller: imageController,
-                        decoration: const InputDecoration(
-                          labelText: 'Image URL',
-                          prefixIcon: Icon(Icons.image_outlined),
-                        ),
+                        pathPrefix: 'modules',
                       ),
                       const SizedBox(height: 8),
                       SwitchListTile.adaptive(
@@ -192,11 +177,8 @@ class _ModulesScreenState extends State<ModulesScreen> {
                           'Make this module visible to students',
                         ),
                         value: isActive,
-                        onChanged: (value) {
-                          setDialogState(() {
-                            isActive = value;
-                          });
-                        },
+                        onChanged: (value) =>
+                            setDialogState(() => isActive = value),
                       ),
                     ],
                   ),
@@ -243,11 +225,8 @@ class _ModulesScreenState extends State<ModulesScreen> {
 
                     if (!mounted || !dialogContext.mounted) return;
                     Navigator.pop(dialogContext);
-
                     final future = _loadData();
-                    setState(() {
-                      _future = future;
-                    });
+                    setState(() => _future = future);
 
                     if (!mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -264,12 +243,8 @@ class _ModulesScreenState extends State<ModulesScreen> {
                     );
                   }
                 },
-                icon: Icon(
-                  module == null ? Icons.add : Icons.save_outlined,
-                ),
-                label: Text(
-                  module == null ? 'Add Module' : 'Save Changes',
-                ),
+                icon: Icon(module == null ? Icons.add : Icons.save_outlined),
+                label: Text(module == null ? 'Add Module' : 'Save Changes'),
               ),
             ],
           ),
@@ -290,12 +265,8 @@ class _ModulesScreenState extends State<ModulesScreen> {
         isActive: !module.isActive,
       );
       if (!mounted) return;
-
       final future = _loadData();
-      setState(() {
-        _future = future;
-      });
-
+      setState(() => _future = future);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -321,7 +292,6 @@ class _ModulesScreenState extends State<ModulesScreen> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-
         if (snapshot.hasError || snapshot.data == null) {
           return _ErrorState(
             message: 'Unable to load modules.',
@@ -424,11 +394,8 @@ class _ModulesScreenState extends State<ModulesScreen> {
                             ),
                           ),
                         ],
-                        onChanged: (value) {
-                          setState(() {
-                            _selectedLevelId = value;
-                          });
-                        },
+                        onChanged: (value) =>
+                            setState(() => _selectedLevelId = value),
                       );
                       final statusFilter = DropdownButtonFormField<String>(
                         initialValue: _status,
@@ -448,11 +415,7 @@ class _ModulesScreenState extends State<ModulesScreen> {
                           ),
                         ],
                         onChanged: (value) {
-                          if (value != null) {
-                            setState(() {
-                              _status = value;
-                            });
-                          }
+                          if (value != null) setState(() => _status = value);
                         },
                       );
 
@@ -739,7 +702,6 @@ class _EmptyModules extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
