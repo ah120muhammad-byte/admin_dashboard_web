@@ -158,77 +158,121 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
     final title = TextEditingController(text: lecture?.title ?? '');
     final description = TextEditingController(text: lecture?.description ?? '');
     final order = TextEditingController(text: '${lecture?.displayOrder ?? 1}');
+    DateTime selectedDate =
+        lecture?.lectureDate ?? lecture?.createdAt ?? DateTime.now();
     final formKey = GlobalKey<FormState>();
+
+    String formatDate(DateTime date) {
+      final local = date.toLocal();
+      final day = local.day.toString().padLeft(2, '0');
+      final month = local.month.toString().padLeft(2, '0');
+      return '$day/$month/${local.year}';
+    }
 
     try {
       final result = await showDialog<_LectureForm>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: Text(lecture == null ? 'Add Lecture' : 'Edit Lecture'),
-          content: SizedBox(
-            width: 560,
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: title,
-                    decoration: const InputDecoration(
-                      labelText: 'Lecture Title',
-                      prefixIcon: Icon(Icons.title_rounded),
-                    ),
-                    validator: (v) => v == null || v.trim().isEmpty
-                        ? 'Lecture title is required'
-                        : null,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, dialogSetState) {
+            return AlertDialog(
+              title: Text(lecture == null ? 'Add Lecture' : 'Edit Lecture'),
+              content: SizedBox(
+                width: 560,
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: title,
+                        decoration: const InputDecoration(
+                          labelText: 'Lecture Title',
+                          prefixIcon: Icon(Icons.title_rounded),
+                        ),
+                        validator: (v) => v == null || v.trim().isEmpty
+                            ? 'Lecture title is required'
+                            : null,
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: description,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          labelText: 'Description',
+                          prefixIcon: Icon(Icons.description_outlined),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: dialogContext,
+                            initialDate: selectedDate,
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2100),
+                            helpText: 'Select lecture date',
+                          );
+                          if (picked == null) return;
+                          dialogSetState(() {
+                            selectedDate = DateTime(
+                              picked.year,
+                              picked.month,
+                              picked.day,
+                            );
+                          });
+                        },
+                        child: InputDecorator(
+                          decoration: const InputDecoration(
+                            labelText: 'Lecture Date',
+                            prefixIcon: Icon(Icons.calendar_month_rounded),
+                            suffixIcon: Icon(Icons.arrow_drop_down_rounded),
+                          ),
+                          child: Text(formatDate(selectedDate)),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: order,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Display Order',
+                          prefixIcon: Icon(Icons.format_list_numbered_rounded),
+                        ),
+                        validator: (v) => int.tryParse(v?.trim() ?? '') == null
+                            ? 'Enter a valid number'
+                            : null,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: description,
-                    maxLines: 3,
-                    decoration: const InputDecoration(
-                      labelText: 'Description',
-                      prefixIcon: Icon(Icons.description_outlined),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: order,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Display Order',
-                      prefixIcon: Icon(Icons.format_list_numbered_rounded),
-                    ),
-                    validator: (v) => int.tryParse(v?.trim() ?? '') == null
-                        ? 'Enter a valid number'
-                        : null,
-                  ),
-                ],
+                ),
               ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (!formKey.currentState!.validate()) return;
-                Navigator.pop(
-                  dialogContext,
-                  _LectureForm(
-                    title: title.text.trim(),
-                    description: description.text.trim().isEmpty
-                        ? null
-                        : description.text.trim(),
-                    order: int.parse(order.text.trim()),
-                  ),
-                );
-              },
-              child: Text(lecture == null ? 'Add Lecture' : 'Save Changes'),
-            ),
-          ],
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton.icon(
+                  onPressed: () {
+                    if (!formKey.currentState!.validate()) return;
+                    Navigator.pop(
+                      dialogContext,
+                      _LectureForm(
+                        title: title.text.trim(),
+                        description: description.text.trim().isEmpty
+                            ? null
+                            : description.text.trim(),
+                        lectureDate: selectedDate,
+                        order: int.parse(order.text.trim()),
+                      ),
+                    );
+                  },
+                  icon: Icon(lecture == null ? Icons.add_rounded : Icons.save_rounded),
+                  label: Text(lecture == null ? 'Add Lecture' : 'Save Changes'),
+                ),
+              ],
+            );
+          },
         ),
       );
 
@@ -240,6 +284,7 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
           title: result.title,
           description: result.description,
           displayOrder: result.order,
+          lectureDate: result.lectureDate,
         );
       } else {
         await _lectures.updateLecture(
@@ -248,6 +293,7 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
           title: result.title,
           description: result.description,
           displayOrder: result.order,
+          lectureDate: result.lectureDate,
         );
       }
 
@@ -530,6 +576,14 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
     }
   }
 
+  String _formatDate(DateTime? date) {
+    if (date == null) return 'No date';
+    final local = date.toLocal();
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    return '$day/$month/${local.year}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -654,6 +708,7 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
                               lecture: lecture,
                               files: files,
                               fileIcon: _fileIcon,
+                              formatDate: _formatDate,
                               dragHandle: ReorderableDragStartListener(
                                 index: index,
                                 child: const Icon(Icons.drag_indicator_rounded),
@@ -687,6 +742,7 @@ class _LectureExpansion extends StatefulWidget {
   final AdminLecture lecture;
   final List<LectureFileItem> files;
   final IconData Function(String) fileIcon;
+  final String Function(DateTime?) formatDate;
   final Widget dragHandle;
   final VoidCallback onEdit;
   final VoidCallback onPublish;
@@ -704,6 +760,7 @@ class _LectureExpansion extends StatefulWidget {
     required this.lecture,
     required this.files,
     required this.fileIcon,
+    required this.formatDate,
     required this.dragHandle,
     required this.onEdit,
     required this.onPublish,
@@ -771,8 +828,32 @@ class _LectureExpansionState extends State<_LectureExpansion> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                subtitle: Text(
-                  '${widget.files.length} ${widget.files.length == 1 ? 'file' : 'files'}',
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(top: 3),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.calendar_today_rounded,
+                        size: 13,
+                        color: scheme.primary,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        widget.formatDate(widget.lecture.lectureDate),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: scheme.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        '${widget.files.length} ${widget.files.length == 1 ? 'file' : 'files'}',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -1016,11 +1097,13 @@ class _Data {
 class _LectureForm {
   final String title;
   final String? description;
+  final DateTime lectureDate;
   final int order;
 
   const _LectureForm({
     required this.title,
     required this.description,
+    required this.lectureDate,
     required this.order,
   });
 }
