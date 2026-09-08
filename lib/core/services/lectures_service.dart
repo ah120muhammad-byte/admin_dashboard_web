@@ -10,6 +10,7 @@ class AdminLecture {
   final int displayOrder;
   final bool isPublished;
   final bool isActive;
+  final DateTime? lectureDate;
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final DateTime? publishedAt;
@@ -22,6 +23,7 @@ class AdminLecture {
     required this.displayOrder,
     required this.isPublished,
     required this.isActive,
+    this.lectureDate,
     this.createdAt,
     this.updatedAt,
     this.publishedAt,
@@ -36,6 +38,9 @@ class AdminLecture {
       displayOrder: (map['display_order'] as num?)?.toInt() ?? 0,
       isPublished: map['is_published'] as bool? ?? false,
       isActive: map['is_active'] as bool? ?? true,
+      lectureDate: map['lecture_date'] != null
+          ? DateTime.tryParse(map['lecture_date'].toString())
+          : null,
       createdAt: map['created_at'] != null
           ? DateTime.tryParse(map['created_at'].toString())
           : null,
@@ -91,7 +96,7 @@ class LecturesService {
   Future<List<AdminLecture>> getLectures() async {
     final response = await _supabase.from('lectures').select(
           'id, module_id, title, description, display_order, is_published, '
-          'is_active, created_at, updated_at, published_at',
+          'is_active, lecture_date, created_at, updated_at, published_at',
         ).order('display_order', ascending: true);
 
     return (response as List)
@@ -116,12 +121,14 @@ class LecturesService {
     required String title,
     String? description,
     required int displayOrder,
+    required DateTime lectureDate,
   }) async {
     final response = await _supabase.from('lectures').insert({
       'module_id': moduleId,
       'title': title,
       'description': description,
       'display_order': displayOrder,
+      'lecture_date': _dateOnly(lectureDate),
       'is_published': false,
       'is_active': true,
     }).select('id').single();
@@ -283,12 +290,14 @@ class LecturesService {
     required String title,
     String? description,
     required int displayOrder,
+    required DateTime lectureDate,
   }) async {
     await _supabase.from('lectures').update({
       'module_id': moduleId,
       'title': title,
       'description': description,
       'display_order': displayOrder,
+      'lecture_date': _dateOnly(lectureDate),
     }).eq('id', id);
   }
 
@@ -371,5 +380,12 @@ class LecturesService {
   String _sanitizeFileName(String fileName) {
     final cleaned = fileName.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
     return cleaned.isEmpty ? 'file' : cleaned;
+  }
+
+  String _dateOnly(DateTime date) {
+    final local = date.toLocal();
+    final month = local.month.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    return '${local.year}-$month-$day';
   }
 }
