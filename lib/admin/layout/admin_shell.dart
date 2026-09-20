@@ -17,7 +17,6 @@ import '../screens/users/users_analytics_dashboard.dart';
 import '../../core/services/admin_settings_service.dart';
 import 'admin_sidebar.dart';
 import 'admin_top_bar.dart';
-import 'admin_theme.dart';
 
 class AdminShell extends StatefulWidget {
   final AdminSettings settings;
@@ -80,10 +79,6 @@ class _AdminShellState extends State<AdminShell> {
     _themeMode = widget.settings.themeMode;
   }
 
-  ThemeData _currentTheme(BuildContext context) {
-    return _themeMode == 'dark' ? AdminTheme.darkTheme : AdminTheme.lightTheme;
-  }
-
   void _setThemeMode(String mode) {
     if (mode != 'light' && mode != 'dark' && mode != 'system') return;
     if (_themeMode == mode) return;
@@ -133,9 +128,7 @@ class _AdminShellState extends State<AdminShell> {
     final isDark = _themeMode == 'dark' ||
         (_themeMode == 'system' && inheritedBrightness == Brightness.dark);
 
-    return Theme(
-      data: _themeMode == 'system' ? Theme.of(context) : _currentTheme(context),
-      child: Scaffold(
+    return Scaffold(
         body: Row(
           children: [
             AdminSidebar(
@@ -171,7 +164,6 @@ class _AdminShellState extends State<AdminShell> {
             ),
           ],
         ),
-      ),
     );
   }
 }
