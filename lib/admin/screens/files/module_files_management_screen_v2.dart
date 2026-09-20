@@ -341,8 +341,10 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
         final pdf = data.files.where((f) => f.fileType == 'pdf').length;
         final audio = data.files.where((f) => f.fileType == 'audio').length;
         final video = data.files.where((f) => f.fileType == 'video').length;
-        return Column(
-          children: [
+        return Material(
+          color: theme.scaffoldBackgroundColor,
+          child: Column(
+            children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
               child: Row(
@@ -398,7 +400,8 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
                 ),
               ),
             ),
-          ],
+            ],
+          ),
         );
       },
     );
