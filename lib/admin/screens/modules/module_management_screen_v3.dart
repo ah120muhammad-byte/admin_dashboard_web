@@ -610,8 +610,10 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
         final active = data.lectures.where((e) => e.isActive).length;
         final published = data.lectures.where((e) => e.isPublished).length;
 
-        return Column(
-          children: [
+        return Material(
+          color: theme.scaffoldBackgroundColor,
+          child: Column(
+            children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
               child: Column(
@@ -731,7 +733,8 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
                       ),
                     ),
             ),
-          ],
+            ],
+          ),
         );
       },
     );
