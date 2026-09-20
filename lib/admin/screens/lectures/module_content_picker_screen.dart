@@ -93,8 +93,10 @@ class _ModuleContentPickerScreenState extends State<ModuleContentPickerScreen> {
                 .where((module) => module.name.toLowerCase().contains(_search))
                 .toList();
 
-        return Column(
-          children: [
+        return Material(
+          color: theme.scaffoldBackgroundColor,
+          child: Column(
+            children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
               child: Column(
@@ -176,7 +178,8 @@ class _ModuleContentPickerScreenState extends State<ModuleContentPickerScreen> {
                       ),
                     ),
             ),
-          ],
+            ],
+          ),
         );
       },
     );
