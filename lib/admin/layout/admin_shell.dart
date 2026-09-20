@@ -147,19 +147,25 @@ class _AdminShellState extends State<AdminShell> {
                     onThemeToggle: _toggleTheme,
                   ),
                   Expanded(
-                    child: ColoredBox(
-                      color: Theme.of(context).scaffoldBackgroundColor,
-                      child: IndexedStack(
-                        index: _selectedIndex,
-                        children: _pages.map((page) {
-                          if (page is SettingsScreenV2) {
-                            return SettingsScreenV2(
-                              onThemeModeChanged: _setThemeMode,
-                            );
-                          }
-                          return page;
-                        }).toList(),
-                      ),
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: ColoredBox(
+                            color: Theme.of(context).scaffoldBackgroundColor,
+                          ),
+                        ),
+                        IndexedStack(
+                          index: _selectedIndex,
+                          children: _pages.map((page) {
+                            if (page is SettingsScreenV2) {
+                              return SettingsScreenV2(
+                                onThemeModeChanged: _setThemeMode,
+                              );
+                            }
+                            return page;
+                          }).toList(),
+                        ),
+                      ],
                     ),
                   ),
                 ],
