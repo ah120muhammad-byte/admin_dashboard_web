@@ -115,9 +115,6 @@ class _AdminAppState extends State<AdminApp> {
       title: 'MediData Admin',
       localizationsDelegates: const [
         FlutterQuillLocalizations.delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
       ],
       supportedLocales: const [Locale('en')],
       theme: AdminTheme.lightTheme,
