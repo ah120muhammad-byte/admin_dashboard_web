@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:admin_dashboard_web/admin/layout/admin_shell.dart';
 import 'package:admin_dashboard_web/admin/layout/admin_theme.dart';
@@ -112,6 +113,13 @@ class _AdminAppState extends State<AdminApp> {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'MediData Admin',
+      localizationsDelegates: const [
+        FlutterQuillLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('en')],
       theme: AdminTheme.lightTheme,
       darkTheme: AdminTheme.darkTheme,
       themeMode: mode,
