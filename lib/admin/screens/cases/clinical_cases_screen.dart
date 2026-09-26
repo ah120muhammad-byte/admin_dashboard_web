@@ -2,9 +2,6 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../core/responsive/responsive.dart';
-import '../../core/theme/app_colors.dart';
-import '../screens/admin_login_screen.dart';
 
 class ClinicalCasesScreen extends StatefulWidget {
   const ClinicalCasesScreen({super.key});
@@ -12,7 +9,6 @@ class ClinicalCasesScreen extends StatefulWidget {
 }
 
 class _ClinicalCasesScreenState extends State<ClinicalCasesScreen> {
-  final _client = Supabase.instance.client;
   final _service = ClinicalCaseAdminService();
   late Future<List<Map<String,dynamic>>> _future;
 
@@ -30,7 +26,7 @@ class _ClinicalCasesScreenState extends State<ClinicalCasesScreen> {
     final management=TextEditingController(text:item?['management']?.toString()??'');
     final medications=TextEditingController(text:item?['medications']?.toString()??'');
     DateTime date=DateTime.tryParse(item?['case_date']?.toString()??'')??DateTime.now();
-    bool published=item?['is_published'] as bool???false;
+    bool published = (item?['is_published'] as bool?) ?? false;
     List<String> images=List<String>.from(item?['image_urls']??const[]);
     bool saving=false;
 
