@@ -59,7 +59,7 @@ class _ClinicalCasesScreenState extends State<ClinicalCasesScreen> {
         ]))),
         actions:[
           TextButton(onPressed:saving?null:()=>Navigator.pop(ctx),child:const Text('Cancel')),
-          FilledButton(onPressed:saving?null||title.text.trim().isEmpty?null:()async{
+          FilledButton(onPressed:(saving || title.text.trim().isEmpty)?null:()async{
             setLocal(()=>saving=true);
             try{
               final data={'title':title.text.trim(),'case_date':DateTime(date.year,date.month,date.day).toIso8601String().split('T').first,'short_description':short.text.trim(),'clinical_presentation':presentation.text.trim(),'history':history.text.trim(),'examination':exam.text.trim(),'investigations':investigations.text.trim(),'diagnosis':diagnosis.text.trim(),'management':management.text.trim(),'medications':medications.text.trim(),'image_urls':images,'is_published':published};
