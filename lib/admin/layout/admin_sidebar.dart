@@ -45,40 +45,35 @@ class AdminSidebar extends StatelessWidget {
         const _SectionLabel('OVERVIEW'),
         _item(context, 0),
         const _SectionGap(),
-        const _SectionLabel('CONTENT'),
+        const _SectionLabel('ACADEMIC'),
         _item(context, 2),
         _item(context, 3),
         _item(context, 4),
         _item(context, 5),
         const _SectionGap(),
-        const _SectionLabel('USER MANAGEMENT'),
-        _item(context, 1),
-        _item(context, 6),
+        const _SectionLabel('CLINICAL'),
+        _item(context, 13),
         const _SectionGap(),
         const _SectionLabel('ASSESSMENT'),
         _item(context, 8),
         _item(context, 9),
         if (analyticsEnabled) _item(context, 10),
         const _SectionGap(),
-        const _SectionLabel('SYSTEM'),
-        _item(context, 7),
-        const _SectionGap(),
-        const _SectionLabel('MAINTENANCE'),
-        _item(context, 11),
-        const _SectionGap(),
-        const _SectionLabel('SUPPORT'),
+        const _SectionLabel('USERS & COMMUNICATION'),
+        _item(context, 1),
+        _item(context, 6),
         _item(context, 12),
         const _SectionGap(),
-        const _SectionLabel('CLINICAL CONTENT'),
-        _item(context, 13),
+        const _SectionLabel('SYSTEM'),
+        _item(context, 7),
+        _item(context, 11),
       ]);
     } else {
-      const compactOrder = [0, 1, 2, 3, 4, 5, 6, 8, 9, 7, 11, 12, 13];
+      const compactOrder = [0, 2, 3, 4, 5, 13, 8, 9, 10, 1, 6, 12, 7, 11];
       for (final index in compactOrder) {
         if (index == 10 && !analyticsEnabled) continue;
         items.add(_item(context, index));
       }
-      if (analyticsEnabled) items.insert(8, _item(context, 10));
     }
 
     return AnimatedContainer(
