@@ -9,6 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_quill: ^11.6.0
   cupertino_icons: ^1.0.8
   supabase_flutter: ^2.17.2
   url_launcher: ^6.3.2
