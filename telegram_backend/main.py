@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 TELEGRAM_LOCAL_PORT = int(os.getenv("TELEGRAM_LOCAL_PORT", "8081"))
 TELEGRAM_API = f"http://127.0.0.1:{TELEGRAM_LOCAL_PORT}"
 TELEGRAM_CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID", "").strip()
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "").strip()
 ALLOWED_ADMIN_USER_IDS = {
@@ -30,6 +31,7 @@ app = FastAPI(title="MediData Telegram Video Backend", version="1.0.0")
 
 def require_env() -> None:
     required = {
+        "TELEGRAM_BOT_TOKEN": TELEGRAM_BOT_TOKEN,
         "TELEGRAM_CHANNEL_ID": TELEGRAM_CHANNEL_ID,
         "SUPABASE_URL": SUPABASE_URL,
         "SUPABASE_ANON_KEY": SUPABASE_ANON_KEY,
@@ -109,7 +111,10 @@ async def send_local_document(file_path: Path, filename: str, caption: str = "")
 
     try:
         async with httpx.AsyncClient(timeout=None) as client:
-            response = await client.post(f"{TELEGRAM_API}/bot/sendDocument", json=payload)
+            response = await client.post(
+                f"{TELEGRAM_API}/bot{TELEGRAM_BOT_TOKEN}/sendDocument",
+                json=payload,
+            )
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail="Could not reach local Telegram Bot API") from exc
 
@@ -142,14 +147,20 @@ async def root() -> JSONResponse:
 async def health() -> JSONResponse:
     telegram_ok = False
     telegram_error = None
+    bot = None
 
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get(f"{TELEGRAM_API}/")
-            telegram_ok = response.status_code == 200
-            if not telegram_ok:
-                telegram_error = response.text[:500]
-    except httpx.HTTPError as exc:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            response = await client.get(
+                f"{TELEGRAM_API}/bot{TELEGRAM_BOT_TOKEN}/getMe"
+            )
+            data = response.json()
+            telegram_ok = response.status_code == 200 and data.get("ok", False)
+            if telegram_ok:
+                bot = data.get("result")
+            else:
+                telegram_error = data.get("description", response.text[:500])
+    except (httpx.HTTPError, ValueError) as exc:
         telegram_error = str(exc)
 
     return JSONResponse(
@@ -157,6 +168,55 @@ async def health() -> JSONResponse:
             "status": "ok",
             "telegram_local_api": telegram_ok,
             "telegram_error": telegram_error,
+            "bot_username": bot.get("username") if bot else None,
+        }
+    )
+
+
+@app.get("/api/telegram/channels")
+async def telegram_channels(
+    user: dict = Depends(current_supabase_user),
+) -> JSONResponse:
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{TELEGRAM_API}/bot{TELEGRAM_BOT_TOKEN}/getUpdates",
+                params={"limit": 100, "allowed_updates": '["channel_post","my_chat_member"]'},
+            )
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="Could not reach local Telegram Bot API",
+        ) from exc
+
+    try:
+        data = response.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail="Invalid Telegram response") from exc
+
+    if response.status_code != 200 or not data.get("ok"):
+        raise HTTPException(
+            status_code=502,
+            detail=data.get("description", "Telegram rejected the request"),
+        )
+
+    channels = {}
+    for update in data.get("result", []):
+        for key in ("channel_post", "edited_channel_post", "my_chat_member"):
+            obj = update.get(key) or {}
+            chat = obj.get("chat") or {}
+            if chat.get("type") == "channel":
+                channels[str(chat.get("id"))] = {
+                    "id": chat.get("id"),
+                    "title": chat.get("title"),
+                    "username": chat.get("username"),
+                }
+
+    return JSONResponse(
+        {
+            "ok": True,
+            "channels": list(channels.values()),
+            "requested_by": user.get("id"),
         }
     )
 
