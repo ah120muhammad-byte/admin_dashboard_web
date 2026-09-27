@@ -347,9 +347,10 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
     });
 
     try {
-      // Request Google authorization while the button click still has
-      // a user gesture, so the browser can open Google's OAuth popup.
+      _message('Connecting to Google Drive...');
       await _files.authorizeGoogleDrive();
+      if (!mounted) return;
+      _message('Google authorization completed. Select your video...');
 
       final picked = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -395,6 +396,7 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
         });
 
         if (item.type == 'video') {
+          _message('Starting video upload...');
           await _files.addLectureVideo(
             lectureId: lecture.id,
             title: _titleFromName(item.file.name),
