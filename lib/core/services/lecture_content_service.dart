@@ -1,6 +1,9 @@
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
+
+import 'google_drive_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ContentLecture {
@@ -79,9 +82,13 @@ class LectureFileItem {
 
 class LectureContentService {
   final SupabaseClient _supabase;
+  final GoogleDriveService _googleDrive;
 
-  LectureContentService({SupabaseClient? supabase})
-      : _supabase = supabase ?? Supabase.instance.client;
+  LectureContentService({
+    SupabaseClient? supabase,
+    GoogleDriveService? googleDrive,
+  })  : _supabase = supabase ?? Supabase.instance.client,
+        _googleDrive = googleDrive ?? GoogleDriveService();
 
   String bucketForType(String type) {
     switch (type.toLowerCase()) {
@@ -137,6 +144,14 @@ class LectureContentService {
   }
 
   Future<String> createFileUrl(LectureFileItem file) async {
+    if (_isGoogleDriveFile(file.fileUrl)) {
+      final fileId = _googleDriveFileId(file.fileUrl);
+      if (fileId.isEmpty) {
+        throw Exception('Invalid Google Drive file ID for: ${file.title}');
+      }
+      return 'https://drive.google.com/file/d/$fileId/view';
+    }
+
     final bucket = bucketForType(file.fileType);
     final path = _extractStoragePath(file.fileUrl, bucket);
 
@@ -227,6 +242,86 @@ class LectureContentService {
         await _supabase.storage.from(bucket).remove([storagePath]);
       } catch (_) {}
       rethrow;
+    }
+  }
+
+  Future<void> addLectureVideo({
+    required String lectureId,
+    required String title,
+    required PlatformFile file,
+    int? displayOrder,
+    void Function(double progress)? onProgress,
+  }) async {
+    final result = await _googleDrive.uploadVideo(
+      file,
+      onProgress: onProgress,
+    );
+
+    final order = displayOrder ?? await _nextDisplayOrder(lectureId);
+
+    try {
+      await _supabase.from('lecture_files').insert({
+        'lecture_id': lectureId,
+        'title': title,
+        'file_type': 'video',
+        'file_url': 'gdrive:${result.fileId}',
+        'display_order': order,
+        'is_active': true,
+      });
+    } catch (e) {
+      try {
+        await _googleDrive.deleteFile(result.fileId);
+      } catch (_) {}
+      rethrow;
+    }
+  }
+
+  Future<void> replaceLectureVideo({
+    required LectureFileItem file,
+    required PlatformFile newFile,
+  }) async {
+    if (!_isGoogleDriveFile(file.fileUrl)) {
+      throw Exception('This video is not stored on Google Drive.');
+    }
+
+    final result = await _googleDrive.uploadVideo(newFile);
+
+    try {
+      final newTitle = _titleFromFileName(newFile.name);
+      await _supabase
+          .from('lecture_files')
+          .update({
+            'file_url': 'gdrive:${result.fileId}',
+            'title': newTitle,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          })
+          .eq('id', file.id);
+
+      final verification = await _supabase
+          .from('lecture_files')
+          .select('id, file_url, title')
+          .eq('id', file.id)
+          .maybeSingle();
+
+      if (verification == null ||
+          verification['file_url']?.toString() != 'gdrive:${result.fileId}' ||
+          verification['title']?.toString() != newTitle) {
+        throw Exception(
+          'The new Google Drive video was uploaded, but the lecture record was not updated correctly.',
+        );
+      }
+    } catch (e) {
+      try {
+        await _googleDrive.deleteFile(result.fileId);
+      } catch (_) {}
+      rethrow;
+    }
+
+    final oldId = _googleDriveFileId(file.fileUrl);
+    if (oldId.isNotEmpty && oldId != result.fileId) {
+      try {
+        await _googleDrive.deleteFile(oldId);
+      } catch (_) {}
     }
   }
 
@@ -348,6 +443,15 @@ class LectureContentService {
   }
 
   Future<void> deleteLectureFile({required LectureFileItem file}) async {
+    if (_isGoogleDriveFile(file.fileUrl)) {
+      final fileId = _googleDriveFileId(file.fileUrl);
+      if (fileId.isNotEmpty) {
+        await _googleDrive.deleteFile(fileId);
+      }
+      await _supabase.from('lecture_files').delete().eq('id', file.id);
+      return;
+    }
+
     final bucket = bucketForType(file.fileType);
     final path = _extractStoragePath(file.fileUrl, bucket);
 
@@ -356,6 +460,15 @@ class LectureContentService {
     }
 
     await _supabase.from('lecture_files').delete().eq('id', file.id);
+  }
+
+  bool _isGoogleDriveFile(String value) {
+    return value.trim().toLowerCase().startsWith('gdrive:');
+  }
+
+  String _googleDriveFileId(String value) {
+    if (!_isGoogleDriveFile(value)) return '';
+    return value.trim().substring('gdrive:'.length).trim();
   }
 
   String _titleFromFileName(String fileName) {
