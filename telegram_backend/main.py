@@ -29,10 +29,9 @@ ALLOWED_EXTENSIONS = {
 app = FastAPI(title="MediData Telegram Video Backend", version="1.0.0")
 
 
-def require_env() -> None:
+def require_base_env() -> None:
     required = {
         "TELEGRAM_BOT_TOKEN": TELEGRAM_BOT_TOKEN,
-        "TELEGRAM_CHANNEL_ID": TELEGRAM_CHANNEL_ID,
         "SUPABASE_URL": SUPABASE_URL,
         "SUPABASE_ANON_KEY": SUPABASE_ANON_KEY,
     }
@@ -44,10 +43,19 @@ def require_env() -> None:
         )
 
 
+def require_upload_env() -> None:
+    require_base_env()
+    if not TELEGRAM_CHANNEL_ID:
+        raise HTTPException(
+            status_code=500,
+            detail="TELEGRAM_CHANNEL_ID is not configured yet. Discover the channel first.",
+        )
+
+
 async def current_supabase_user(
     authorization: Optional[str] = Header(default=None),
 ) -> dict:
-    require_env()
+    require_base_env()
 
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Missing Supabase access token")
@@ -228,7 +236,7 @@ async def upload_video(
     lecture_id: Optional[str] = None,
     user: dict = Depends(current_supabase_user),
 ) -> JSONResponse:
-    require_env()
+    require_upload_env()
 
     filename = safe_filename(file.filename or "video.mp4")
     extension = Path(filename).suffix.lower()
