@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: medidata-telegram-backend
+    runtime: docker
+    rootDir: telegram_backend
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: TELEGRAM_API_ID
+        sync: false
+      - key: TELEGRAM_API_HASH
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHANNEL_ID
+        sync: false
+      - key: SUPABASE_URL
+        value: https://eoyehpqknyoksaxlvnwl.supabase.co
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: ALLOWED_ADMIN_USER_IDS
+        value: ""
+      - key: TELEGRAM_LOCAL_PORT
+        value: "8081"
