@@ -17,7 +17,7 @@ Telegram Local Bot API is required for videos larger than the normal Bot API upl
 TELEGRAM_API_ID
 TELEGRAM_API_HASH
 TELEGRAM_BOT_TOKEN
-TELEGRAM_CHANNEL_ID
+TELEGRAM_CHANNEL_ID (can be added after channel discovery)
 SUPABASE_URL
 SUPABASE_ANON_KEY
 
@@ -75,3 +75,14 @@ These values will later be stored in Supabase lecture_files so the student app c
 ## Important
 
 Render Free uses an ephemeral filesystem and can spin down after 15 minutes of inactivity. The video is only stored there while being processed; the intended persistent storage is Telegram.
+
+
+## First-time channel ID discovery
+
+You can deploy without TELEGRAM_CHANNEL_ID initially.
+
+After the bot is an administrator in the private channel, post a new message in that channel. Then call:
+GET /api/telegram/channels
+with the same Supabase access token used by the Admin Dashboard.
+
+The endpoint returns channel IDs visible to the bot. Put the selected ID into the Render TELEGRAM_CHANNEL_ID environment variable and redeploy.
