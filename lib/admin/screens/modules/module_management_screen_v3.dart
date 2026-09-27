@@ -403,15 +403,15 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
             },
           );
         } else {
-          final bytes = item.file.bytes;
-          if (bytes == null) {
+          Uint8List? selectedBytes = item.file.bytes;
+          if (selectedBytes == null) {
             final stream = item.file.readStream;
             if (stream == null) throw Exception('Unable to read ${item.file.name}.');
             final builder = BytesBuilder();
             await for (final chunk in stream) { builder.add(chunk); }
-            final bytes = builder.takeBytes();
+            selectedBytes = builder.takeBytes();
           }
-          if (bytes.isEmpty) {
+          if (selectedBytes == null || selectedBytes.isEmpty) {
             throw Exception('Unable to read ${item.file.name}.');
           }
 
@@ -419,7 +419,7 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
             lectureId: lecture.id,
             title: _titleFromName(item.file.name),
             fileType: item.type,
-            bytes: bytes,
+            bytes: selectedBytes,
             fileName: item.file.name,
             onProgress: (progress) {
               if (!mounted) return;
@@ -506,22 +506,22 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
           newFile: selected,
         );
       } else {
-        final bytes = selected.bytes;
-        if (bytes == null) {
+        Uint8List? selectedBytes = selected.bytes;
+        if (selectedBytes == null) {
           final stream = selected.readStream;
           if (stream == null) throw Exception('Unable to read the selected file.');
           final builder = BytesBuilder();
           await for (final chunk in stream) { builder.add(chunk); }
-          final bytes = builder.takeBytes();
+          selectedBytes = builder.takeBytes();
         }
-        if (bytes.isEmpty) {
+        if (selectedBytes == null || selectedBytes.isEmpty) {
           _message('Unable to read the selected file.', error: true);
           return;
         }
 
         await _files.replaceLectureFile(
           file: file,
-          bytes: bytes,
+          bytes: selectedBytes,
           newFileName: selected.name,
         );
       }
