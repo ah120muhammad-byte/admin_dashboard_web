@@ -4,7 +4,6 @@ set -eu
 : "${TELEGRAM_API_ID:?TELEGRAM_API_ID is required}"
 : "${TELEGRAM_API_HASH:?TELEGRAM_API_HASH is required}"
 : "${TELEGRAM_BOT_TOKEN:?TELEGRAM_BOT_TOKEN is required}"
-: "${TELEGRAM_CHANNEL_ID:?TELEGRAM_CHANNEL_ID is required}"
 : "${SUPABASE_URL:?SUPABASE_URL is required}"
 : "${SUPABASE_ANON_KEY:?SUPABASE_ANON_KEY is required}"
 
