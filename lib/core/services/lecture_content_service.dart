@@ -90,6 +90,10 @@ class LectureContentService {
   })  : _supabase = supabase ?? Supabase.instance.client,
         _googleDrive = googleDrive ?? GoogleDriveService();
 
+  Future<void> authorizeGoogleDrive() async {
+    await _googleDrive.authorize();
+  }
+
   String bucketForType(String type) {
     switch (type.toLowerCase()) {
       case 'pdf':
