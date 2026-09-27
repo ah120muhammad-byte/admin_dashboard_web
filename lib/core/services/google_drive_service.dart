@@ -28,6 +28,8 @@ class GoogleDriveService {
   final Dio _dio;
   GoogleDriveService({Dio? dio}) : _dio = dio ?? Dio();
 
+  Future<String> authorize() => _getAccessToken();
+
   Future<String> _getAccessToken() async {
     final google = globalContext['google'];
     if (!google.isDefinedAndNotNull) {
@@ -197,7 +199,7 @@ class GoogleDriveService {
 
           final range = response.headers.value('range');
           if (range != null) {
-            final match = RegExp(r'bytes=\\d+-(\\d+)').firstMatch(range);
+            final match = RegExp(r'bytes=\d+-(\d+)').firstMatch(range);
             if (match != null) {
               return {
                 'nextOffset': int.parse(match.group(1)!) + 1,
