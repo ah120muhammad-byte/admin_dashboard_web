@@ -20,6 +20,10 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
 
   late Future<_Data> _future;
   bool _addingFile = false;
+  double _uploadProgress = 0;
+  String _uploadCurrentFile = '';
+  int _uploadCompleted = 0;
+  int _uploadTotal = 0;
   bool _reorderingLectures = false;
   final Set<String> _busyFileIds = <String>{};
   final Set<String> _reorderingFileLectureIds = <String>{};
@@ -313,93 +317,107 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
     }
   }
 
-  Future<void> _addFile(AdminLecture lecture, String type) async {
-    if (_addingFile) return;
+  String? _fileTypeFromName(String name) {
+    final extension = name.contains('.') ? name.split('.').last.toLowerCase() : '';
+    if (extension == 'pdf') return 'pdf';
+    if (['mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac'].contains(extension)) {
+      return 'audio';
+    }
+    if (['mp4', 'mov', 'm4v', 'webm', 'avi', 'mkv'].contains(extension)) {
+      return 'video';
+    }
+    return null;
+  }
 
-    final extensions = _extensionsForType(type);
+  String _titleFromName(String name) {
+    return name.replaceFirst(RegExp(r'\.[^.]+$'), '');
+  }
+
+  Future<void> _addFiles(AdminLecture lecture) async {
+    if (_addingFile) return;
 
     setState(() {
       _addingFile = true;
+      _uploadProgress = 0;
+      _uploadCurrentFile = '';
+      _uploadCompleted = 0;
+      _uploadTotal = 0;
     });
 
     try {
       final picked = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: extensions,
+        allowedExtensions: [
+          'pdf',
+          'mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac',
+          'mp4', 'mov', 'm4v', 'webm', 'avi', 'mkv',
+        ],
+        allowMultiple: true,
         withData: true,
       );
 
       if (!mounted || picked == null || picked.files.isEmpty) return;
 
-      final file = picked.files.single;
-      final bytes = file.bytes;
-      if (bytes == null || bytes.isEmpty) {
-        _message('Unable to read the selected file.', error: true);
+      final files = picked.files
+          .where((file) => file.bytes != null && file.bytes!.isNotEmpty)
+          .map((file) {
+            final type = _fileTypeFromName(file.name);
+            return type == null ? null : (file: file, type: type);
+          })
+          .whereType<({PlatformFile file, String type})>()
+          .toList();
+
+      if (files.isEmpty) {
+        _message('No supported PDF, audio, or video files were selected.', error: true);
         return;
       }
 
-      final titleController = TextEditingController(
-        text: file.name.replaceFirst(RegExp(r'\.[^.]+$'), ''),
-      );
-      final formKey = GlobalKey<FormState>();
+      setState(() {
+        _uploadTotal = files.length;
+      });
 
-      try {
-        final title = await showDialog<String>(
-          context: context,
-          builder: (dialogContext) => AlertDialog(
-            title: Text('Add ${type.toUpperCase()}'),
-            content: Form(
-              key: formKey,
-              child: TextFormField(
-                controller: titleController,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Content Title',
-                  prefixIcon: Icon(Icons.title_rounded),
-                ),
-                validator: (v) => v == null || v.trim().isEmpty
-                    ? 'Content title is required'
-                    : null,
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  if (!formKey.currentState!.validate()) return;
-                  Navigator.pop(dialogContext, titleController.text.trim());
-                },
-                child: const Text('Upload'),
-              ),
-            ],
-          ),
-        );
+      for (final item in files) {
+        if (!mounted) return;
 
-        if (!mounted || title == null) return;
+        setState(() {
+          _uploadCurrentFile = item.file.name;
+          _uploadProgress = 0;
+        });
 
         await _files.addLectureFile(
           lectureId: lecture.id,
-          title: title,
-          fileType: type,
-          bytes: bytes,
-          fileName: file.name,
+          title: _titleFromName(item.file.name),
+          fileType: item.type,
+          bytes: item.file.bytes!,
+          fileName: item.file.name,
+          onProgress: (progress) {
+            if (!mounted) return;
+            setState(() {
+              _uploadProgress = progress;
+            });
+          },
         );
 
         if (!mounted) return;
-        _message('${type.toUpperCase()} uploaded successfully.');
-        await _refresh();
-      } finally {
-        titleController.dispose();
+        setState(() {
+          _uploadCompleted++;
+          _uploadProgress = 1;
+        });
       }
+
+      if (!mounted) return;
+      _message('${files.length} file${files.length == 1 ? '' : 's'} uploaded successfully.');
+      await _refresh();
     } catch (e) {
       if (mounted) _message('Upload failed: $e', error: true);
     } finally {
       if (mounted) {
         setState(() {
           _addingFile = false;
+          _uploadCurrentFile = '';
+          _uploadProgress = 0;
+          _uploadCompleted = 0;
+          _uploadTotal = 0;
         });
       }
     }
@@ -682,6 +700,36 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
                 ],
               ),
             ),
+            if (_addingFile)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(24, 12, 24, 14),
+                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.45),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.cloud_upload_rounded, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Uploading $_uploadCurrentFile • $_uploadCompleted / $_uploadTotal',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        Text('${(_uploadProgress * 100).round()}%'),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    LinearProgressIndicator(value: _uploadProgress),
+                  ],
+                ),
+              ),
             const Divider(height: 1),
             Expanded(
               child: data.lectures.isEmpty
@@ -718,7 +766,7 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
                               onEdit: () => _editLecture(lecture: lecture),
                               onPublish: () => _toggleLecture(lecture, true),
                               onActive: () => _toggleLecture(lecture, false),
-                              onAddFile: (type) => _addFile(lecture, type),
+                              onAddFiles: () => _addFiles(lecture),
                               onOpenFile: _openFile,
                               onReplaceFile: _replaceFile,
                               onDeleteFile: _deleteFile,
@@ -750,7 +798,7 @@ class _LectureExpansion extends StatefulWidget {
   final VoidCallback onEdit;
   final VoidCallback onPublish;
   final VoidCallback onActive;
-  final ValueChanged<String> onAddFile;
+  final VoidCallback onAddFiles;
   final Future<void> Function(LectureFileItem) onOpenFile;
   final Future<void> Function(LectureFileItem) onReplaceFile;
   final Future<void> Function(LectureFileItem) onDeleteFile;
@@ -768,7 +816,7 @@ class _LectureExpansion extends StatefulWidget {
     required this.onEdit,
     required this.onPublish,
     required this.onActive,
-    required this.onAddFile,
+    required this.onAddFiles,
     required this.onOpenFile,
     required this.onReplaceFile,
     required this.onDeleteFile,
@@ -910,25 +958,9 @@ class _LectureExpansionState extends State<_LectureExpansion> {
                     runSpacing: 8,
                     children: [
                       OutlinedButton.icon(
-                        onPressed: widget.addingFile
-                            ? null
-                            : () => widget.onAddFile('pdf'),
-                        icon: const Icon(Icons.picture_as_pdf_rounded),
-                        label: const Text('Add PDF'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: widget.addingFile
-                            ? null
-                            : () => widget.onAddFile('audio'),
-                        icon: const Icon(Icons.audio_file_rounded),
-                        label: const Text('Add Audio'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: widget.addingFile
-                            ? null
-                            : () => widget.onAddFile('video'),
-                        icon: const Icon(Icons.video_file_rounded),
-                        label: const Text('Add Video'),
+                        onPressed: widget.addingFile ? null : widget.onAddFiles,
+                        icon: const Icon(Icons.upload_file_rounded),
+                        label: const Text('Add Files (PDF / Audio / Video)'),
                       ),
                       OutlinedButton.icon(
                         onPressed: widget.onEdit,
