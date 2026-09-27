@@ -74,8 +74,7 @@ class GoogleDriveService {
         }
 
         final tokenString = token.toString();
-        _accessToken = tokenString;
-        if (!completer.isCompleted) {
+            if (!completer.isCompleted) {
           completer.complete(tokenString);
         }
       } catch (e) {
