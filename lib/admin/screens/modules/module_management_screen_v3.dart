@@ -347,6 +347,10 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
     });
 
     try {
+      // Request Google authorization while the button click still has
+      // a user gesture, so the browser can open Google's OAuth popup.
+      await _files.googleDriveService.authorize();
+
       final picked = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: [
