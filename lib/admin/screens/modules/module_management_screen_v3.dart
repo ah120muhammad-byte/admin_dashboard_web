@@ -353,13 +353,14 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
           'mp4', 'mov', 'm4v', 'webm', 'avi', 'mkv',
         ],
         allowMultiple: true,
-        withData: true,
+        withData: false,
+        withReadStream: true,
+        readSequential: true,
       );
 
       if (!mounted || picked == null || picked.files.isEmpty) return;
 
       final files = picked.files
-          .where((file) => file.bytes != null && file.bytes!.isNotEmpty)
           .map((file) {
             final type = _fileTypeFromName(file.name);
             return type == null ? null : (file: file, type: type);
@@ -368,7 +369,10 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
           .toList();
 
       if (files.isEmpty) {
-        _message('No supported PDF, audio, or video files were selected.', error: true);
+        _message(
+          'No supported PDF, audio, or video files were selected.',
+          error: true,
+        );
         return;
       }
 
@@ -384,19 +388,38 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
           _uploadProgress = 0;
         });
 
-        await _files.addLectureFile(
-          lectureId: lecture.id,
-          title: _titleFromName(item.file.name),
-          fileType: item.type,
-          bytes: item.file.bytes!,
-          fileName: item.file.name,
-          onProgress: (progress) {
-            if (!mounted) return;
-            setState(() {
-              _uploadProgress = progress;
-            });
-          },
-        );
+        if (item.type == 'video') {
+          await _files.addLectureVideo(
+            lectureId: lecture.id,
+            title: _titleFromName(item.file.name),
+            file: item.file,
+            onProgress: (progress) {
+              if (!mounted) return;
+              setState(() {
+                _uploadProgress = progress;
+              });
+            },
+          );
+        } else {
+          final bytes = await item.file.readAsBytes();
+          if (bytes.isEmpty) {
+            throw Exception('Unable to read ${item.file.name}.');
+          }
+
+          await _files.addLectureFile(
+            lectureId: lecture.id,
+            title: _titleFromName(item.file.name),
+            fileType: item.type,
+            bytes: bytes,
+            fileName: item.file.name,
+            onProgress: (progress) {
+              if (!mounted) return;
+              setState(() {
+                _uploadProgress = progress;
+              });
+            },
+          );
+        }
 
         if (!mounted) return;
         setState(() {
@@ -406,7 +429,9 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
       }
 
       if (!mounted) return;
-      _message('${files.length} file${files.length == 1 ? '' : 's'} uploaded successfully.');
+      _message(
+        '${files.length} file${files.length == 1 ? '' : 's'} uploaded successfully.',
+      );
       await _refresh();
     } catch (e) {
       if (mounted) _message('Upload failed: $e', error: true);
@@ -435,17 +460,14 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
       final picked = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: extensions,
-        withData: true,
+        withData: false,
+        withReadStream: true,
+        readSequential: true,
       );
 
       if (!mounted || picked == null || picked.files.isEmpty) return;
 
       final selected = picked.files.single;
-      final bytes = selected.bytes;
-      if (bytes == null || bytes.isEmpty) {
-        _message('Unable to read the selected file.', error: true);
-        return;
-      }
 
       final confirmed = await showDialog<bool>(
         context: context,
@@ -469,11 +491,24 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
 
       if (!mounted || confirmed != true) return;
 
-      await _files.replaceLectureFile(
-        file: file,
-        bytes: bytes,
-        newFileName: selected.name,
-      );
+      if (file.fileType == 'video') {
+        await _files.replaceLectureVideo(
+          file: file,
+          newFile: selected,
+        );
+      } else {
+        final bytes = await selected.readAsBytes();
+        if (bytes.isEmpty) {
+          _message('Unable to read the selected file.', error: true);
+          return;
+        }
+
+        await _files.replaceLectureFile(
+          file: file,
+          bytes: bytes,
+          newFileName: selected.name,
+        );
+      }
 
       if (!mounted) return;
       _message('${file.fileType.toUpperCase()} replaced successfully.');
