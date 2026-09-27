@@ -159,7 +159,7 @@ class _ModuleContentPickerScreenState extends State<ModuleContentPickerScreen> {
                         padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
                         gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                           maxCrossAxisExtent: 420,
-                          mainAxisExtent: 250,
+                          mainAxisExtent: 200,
                           crossAxisSpacing: 14,
                           mainAxisSpacing: 14,
                         ),
@@ -261,13 +261,9 @@ class _ModuleCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: onTap,
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('Manage / Add Lectures'),
-                ),
+              Text(
+                'Open to manage lectures & PDF / Audio / Video',
+                style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
               ),
             ],
           ),
