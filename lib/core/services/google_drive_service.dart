@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:js' as js;
-import 'dart:js_util' as js_util;
+import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -31,48 +31,42 @@ class GoogleDriveService {
   GoogleDriveService({Dio? dio}) : _dio = dio ?? Dio();
 
   Future<String> _getAccessToken() async {
-    if (_accessToken != null && _accessToken!.isNotEmpty) {
-      return _accessToken!;
-    }
-
-    final google = js_util.getProperty<Object?>(js_util.globalThis, 'google');
-    if (google == null) {
+    final google = globalContext['google'];
+    if (!google.isDefinedAndNotNull) {
       throw Exception(
         'Google OAuth library is not loaded. Please refresh the admin page.',
       );
     }
 
-    final accounts = js_util.getProperty<Object?>(google, 'accounts');
-    final oauth2 = accounts == null
-        ? null
-        : js_util.getProperty<Object?>(accounts, 'oauth2');
+    final accounts = (google as JSObject)['accounts'];
+    final oauth2 = (accounts as JSObject)['oauth2'];
 
-    if (oauth2 == null) {
+    if (!oauth2.isDefinedAndNotNull) {
       throw Exception('Google OAuth is unavailable. Please refresh the page.');
     }
 
     final initTokenClient =
-        js_util.getProperty<Object?>(oauth2, 'initTokenClient');
+        (oauth2 as JSObject)['initTokenClient'] as JSFunction?;
+
     if (initTokenClient == null) {
       throw Exception('Google OAuth token client is unavailable.');
     }
 
     final completer = Completer<String>();
 
-    final callback = js.allowInterop((Object response) {
+    void handleResponse(JSAny? response) {
       try {
-        final error = js_util.getProperty<Object?>(response, 'error');
-        if (error != null) {
+        final object = response as JSObject;
+        final error = object['error'];
+        if (error.isDefinedAndNotNull) {
           if (!completer.isCompleted) {
             completer.completeError(Exception(error.toString()));
           }
           return;
         }
 
-        final token =
-            js_util.getProperty<String?>(response, 'access_token');
-
-        if (token == null || token.isEmpty) {
+        final token = object['access_token'];
+        if (!token.isDefinedAndNotNull) {
           if (!completer.isCompleted) {
             completer.completeError(
               Exception('Google did not return an access token.'),
@@ -81,34 +75,40 @@ class GoogleDriveService {
           return;
         }
 
-        _accessToken = token;
+        final tokenString = token.toString();
+        _accessToken = tokenString;
         if (!completer.isCompleted) {
-          completer.complete(token);
+          completer.complete(tokenString);
         }
       } catch (e) {
         if (!completer.isCompleted) completer.completeError(e);
       }
-    });
+    }
 
-    final config = js_util.jsify(<String, Object?>{
+    final config = {
       'client_id': clientId,
       'scope': scope,
-      'callback': callback,
-    });
+      'callback': handleResponse.toJS,
+    }.jsify();
 
-    final client = js_util.callMethod<Object?>(
+    final client = initTokenClient.callAsFunction(
       oauth2,
-      'initTokenClient',
-      [config],
-    );
+      config,
+    ) as JSObject?;
 
     if (client == null) {
       throw Exception('Unable to initialize Google OAuth.');
     }
 
-    js_util.callMethod<void>(client, 'requestAccessToken', [
-      js_util.jsify({'prompt': ''}),
-    ]);
+    final requestAccessToken = client['requestAccessToken'] as JSFunction?;
+    if (requestAccessToken == null) {
+      throw Exception('Google OAuth requestAccessToken is unavailable.');
+    }
+
+    requestAccessToken.callAsFunction(
+      client,
+      {'prompt': ''}.jsify(),
+    );
 
     return completer.future.timeout(
       const Duration(minutes: 2),
@@ -121,9 +121,9 @@ class GoogleDriveService {
     void Function(double progress)? onProgress,
   }) async {
     final token = await _getAccessToken();
-    final total = await file.length();
+    final total = file.size;
 
-    if (total == null || total <= 0) {
+    if (total <= 0) {
       throw Exception('Unable to determine the selected video size.');
     }
 
@@ -154,7 +154,7 @@ class GoogleDriveService {
       throw Exception('Google Drive did not return an upload session.');
     }
 
-    final stream = file.readAsByteStream();
+    final stream = file.readStream;
     if (stream == null) {
       throw Exception('Unable to stream the selected video.');
     }
