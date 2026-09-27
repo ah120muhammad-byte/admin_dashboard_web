@@ -76,7 +76,7 @@ class GoogleDriveService {
         }
 
         final tokenString = token.toString();
-            if (!completer.isCompleted) {
+        if (!completer.isCompleted) {
           completer.complete(tokenString);
         }
       } catch (e) {
@@ -106,7 +106,7 @@ class GoogleDriveService {
 
     requestAccessToken.callAsFunction(
       client,
-      {'prompt': ''}.jsify(),
+      {'prompt': 'consent'}.jsify(),
     );
 
     return completer.future.timeout(
