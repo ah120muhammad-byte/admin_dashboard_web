@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -401,7 +403,14 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
             },
           );
         } else {
-          final bytes = await item.file.readAsBytes();
+          final bytes = item.file.bytes;
+          if (bytes == null) {
+            final stream = item.file.readStream;
+            if (stream == null) throw Exception('Unable to read ${item.file.name}.');
+            final builder = BytesBuilder();
+            await for (final chunk in stream) { builder.add(chunk); }
+            final bytes = builder.takeBytes();
+          }
           if (bytes.isEmpty) {
             throw Exception('Unable to read ${item.file.name}.');
           }
@@ -497,7 +506,14 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
           newFile: selected,
         );
       } else {
-        final bytes = await selected.readAsBytes();
+        final bytes = selected.bytes;
+        if (bytes == null) {
+          final stream = selected.readStream;
+          if (stream == null) throw Exception('Unable to read the selected file.');
+          final builder = BytesBuilder();
+          await for (final chunk in stream) { builder.add(chunk); }
+          final bytes = builder.takeBytes();
+        }
         if (bytes.isEmpty) {
           _message('Unable to read the selected file.', error: true);
           return;
