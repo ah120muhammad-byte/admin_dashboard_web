@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:dio/dio.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ContentLecture {
@@ -177,6 +178,7 @@ class LectureContentService {
     required List<int> bytes,
     required String fileName,
     int? displayOrder,
+    void Function(double progress)? onProgress,
   }) async {
     final bucket = bucketForType(fileType);
     final safeFileName = _sanitizeFileName(fileName);
@@ -185,11 +187,30 @@ class LectureContentService {
     final uploadBytes = bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
 
     try {
-      await _supabase.storage.from(bucket).uploadBinary(
-        storagePath,
-        uploadBytes,
-        fileOptions: const FileOptions(upsert: false),
+      final session = _supabase.auth.currentSession;
+      final token = session?.accessToken;
+      if (token == null || token.isEmpty) {
+        throw Exception('Your admin session has expired. Please sign in again.');
+      }
+
+      final headers = <String, dynamic>{
+        ..._supabase.headers,
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/octet-stream',
+      };
+
+      await Dio().post<void>(
+        '${_supabase.storage.url}/$bucket/${Uri.encodeFull(storagePath)}',
+        data: uploadBytes,
+        options: Options(headers: headers),
+        onSendProgress: (sent, total) {
+          if (total > 0) {
+            onProgress?.call((sent / total).clamp(0.0, 1.0));
+          }
+        },
       );
+
+      onProgress?.call(1.0);
 
       final order = displayOrder ?? await _nextDisplayOrder(lectureId);
 
