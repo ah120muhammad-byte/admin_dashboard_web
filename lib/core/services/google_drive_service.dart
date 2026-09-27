@@ -177,7 +177,6 @@ class GoogleDriveService {
             options: Options(
               headers: {
                 'Authorization': 'Bearer $token',
-                'Content-Length': chunk.length,
                 'Content-Range': 'bytes $start-$end/$total',
                 'Content-Type': mimeType,
               },
