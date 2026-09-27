@@ -26,8 +26,6 @@ class GoogleDriveService {
   static const int chunkSize = 8 * 1024 * 1024;
 
   final Dio _dio;
-  String? _accessToken;
-
   GoogleDriveService({Dio? dio}) : _dio = dio ?? Dio();
 
   Future<String> _getAccessToken() async {
