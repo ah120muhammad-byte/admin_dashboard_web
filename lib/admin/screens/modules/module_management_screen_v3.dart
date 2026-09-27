@@ -411,7 +411,7 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
             await for (final chunk in stream) { builder.add(chunk); }
             selectedBytes = builder.takeBytes();
           }
-          if (selectedBytes == null || selectedBytes.isEmpty) {
+          if (selectedBytes.isEmpty) {
             throw Exception('Unable to read ${item.file.name}.');
           }
 
@@ -514,7 +514,7 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
           await for (final chunk in stream) { builder.add(chunk); }
           selectedBytes = builder.takeBytes();
         }
-        if (selectedBytes == null || selectedBytes.isEmpty) {
+        if (selectedBytes.isEmpty) {
           _message('Unable to read the selected file.', error: true);
           return;
         }
