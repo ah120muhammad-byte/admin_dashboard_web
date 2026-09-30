@@ -109,6 +109,44 @@ async def current_supabase_user(
     return user
 
 
+async def require_admin_user(user: dict = Depends(current_supabase_user)) -> dict:
+    user_id = str(user.get("id", "")).strip()
+    if not user_id:
+        raise HTTPException(status_code=403, detail="Authenticated user ID is missing")
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{SUPABASE_URL}/rest/v1/profiles",
+                params={
+                    "select": "role",
+                    "id": f"eq.{user_id}",
+                    "limit": "1",
+                },
+                headers={
+                    "Authorization": f"Bearer {user.get('_access_token', '')}",
+                    "apikey": SUPABASE_ANON_KEY,
+                },
+            )
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=503, detail="Supabase profile service is unavailable") from exc
+
+    if response.status_code != 200:
+        raise HTTPException(status_code=403, detail="Unable to verify admin role")
+
+    try:
+        rows = response.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail="Invalid Supabase profile response") from exc
+
+    role = rows[0].get("role") if rows else None
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Admin role is required")
+
+    user['_access_token'] = access_token
+    return user
+
+
 def safe_filename(name: str) -> str:
     name = Path(name or "video.mp4").name
     name = re.sub(r"[^A-Za-z0-9._ -]+", "_", name).strip()
@@ -245,7 +283,7 @@ async def telegram_file(
 @app.delete("/api/telegram/message/{message_id}")
 async def delete_telegram_message(
     message_id: int,
-    user: dict = Depends(current_supabase_user),
+    user: dict = Depends(require_admin_user),
 ) -> JSONResponse:
     require_upload_env()
 
@@ -277,7 +315,7 @@ async def delete_telegram_message(
 
 @app.get("/api/telegram/channels")
 async def telegram_channels(
-    user: dict = Depends(current_supabase_user),
+    user: dict = Depends(require_admin_user),
 ) -> JSONResponse:
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
@@ -328,7 +366,7 @@ async def upload_video(
     file: UploadFile = File(...),
     title: Optional[str] = None,
     lecture_id: Optional[str] = None,
-    user: dict = Depends(current_supabase_user),
+    user: dict = Depends(require_admin_user),
 ) -> JSONResponse:
     require_upload_env()
 
