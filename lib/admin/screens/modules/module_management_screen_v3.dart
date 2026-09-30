@@ -347,11 +347,7 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
     });
 
     try {
-      _message('Connecting to Google Drive...');
-      await _files.authorizeGoogleDrive();
-      if (!mounted) return;
-      _message('Google authorization completed. Select your video...');
-
+      _message('Select the lecture files to upload...');
       final picked = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: [
