@@ -21,6 +21,9 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
   bool _busy = false;
   double? _uploadProgress;
   String? _uploadLabel;
+  String _uploadCurrentFile = '';
+  int _uploadCompleted = 0;
+  int _uploadTotal = 0;
 
   @override
   void initState() {
@@ -71,139 +74,118 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
     final extensions = _extensionsForType(type);
     setState(() {
       _busy = true;
-      _uploadProgress = null;
+      _uploadProgress = 0;
       _uploadLabel = 'Preparing upload...';
+      _uploadCurrentFile = '';
+      _uploadCompleted = 0;
+      _uploadTotal = 0;
     });
 
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: extensions,
+        allowMultiple: true,
         withData: type != 'video',
-        withReadStream: type == 'video',
+        withReadStream: true,
+        readSequential: true,
       );
       if (!mounted || result == null || result.files.isEmpty) return;
 
-      final picked = result.files.single;
-      final titleController = TextEditingController(
-        text: picked.name.replaceFirst(RegExp(r'\.[^.]+$'), ''),
-      );
-      final orderController =
-          TextEditingController(text: '${await _nextOrder(lecture.id)}');
-      final key = GlobalKey<FormState>();
+      final files = result.files;
+      setState(() {
+        _uploadTotal = files.length;
+        _uploadCurrentFile = files.first.name;
+      });
 
-      try {
-        final details = await showDialog<_FileDetails>(
-          context: context,
-          barrierDismissible: false,
-          builder: (dialogContext) => AlertDialog(
-            title: Text('Add ${type.toUpperCase()}'),
-            content: Form(
-              key: key,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: titleController,
-                    decoration: const InputDecoration(labelText: 'File Title'),
-                    validator: (v) =>
-                        v == null || v.trim().isEmpty ? 'Title is required' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: orderController,
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Display Order'),
-                    validator: (v) => int.tryParse(v?.trim() ?? '') == null
-                        ? 'Enter a valid number'
-                        : null,
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  if (!key.currentState!.validate()) return;
-                  Navigator.pop(
-                    dialogContext,
-                    _FileDetails(
-                      title: titleController.text.trim(),
-                      displayOrder: int.parse(orderController.text.trim()),
-                    ),
-                  );
-                },
-                child: const Text('Upload'),
-              ),
-            ],
-          ),
-        );
+      var nextOrder = await _nextOrder(lecture.id);
 
-        if (!mounted || details == null) return;
+      for (final picked in files) {
+        if (!mounted) return;
+
+        setState(() {
+          _uploadCurrentFile = picked.name;
+          _uploadProgress = 0;
+          _uploadLabel =
+              'Uploading ${type.toUpperCase()} • ${_uploadCompleted + 1}/$_uploadTotal';
+        });
 
         if (type == 'video') {
           if (picked.readStream == null) {
-            _message(
-              'Unable to stream the selected video. Please select it again.',
-              error: true,
+            throw Exception(
+              'Unable to stream "${picked.name}". Please select it again.',
             );
-            return;
           }
 
           await _filesService.addLectureVideo(
             lectureId: lecture.id,
-            title: details.title,
+            title: picked.name.replaceFirst(RegExp(r'\.[^.]+$'), ''),
             file: picked,
-            displayOrder: details.displayOrder,
+            displayOrder: nextOrder++,
             onProgress: (progress) {
               if (!mounted) return;
               setState(() {
                 _uploadProgress = progress;
-                _uploadLabel = 'Uploading VIDEO...';
               });
             },
           );
         } else {
-          final bytes = picked.bytes;
-          if (bytes == null || bytes.isEmpty) {
-            _message('Unable to read the selected file.', error: true);
-            return;
+          Uint8List? bytes = picked.bytes;
+          if (bytes == null) {
+            final stream = picked.readStream;
+            if (stream == null) {
+              throw Exception('Unable to read "${picked.name}".');
+            }
+            final builder = BytesBuilder();
+            await for (final chunk in stream) {
+              builder.add(chunk);
+            }
+            bytes = builder.takeBytes();
+          }
+
+          if (bytes.isEmpty) {
+            throw Exception('Unable to read "${picked.name}".');
           }
 
           await _filesService.addLectureFile(
             lectureId: lecture.id,
-            title: details.title,
+            title: picked.name.replaceFirst(RegExp(r'\.[^.]+$'), ''),
             fileType: type,
             bytes: bytes,
             fileName: picked.name,
-            displayOrder: details.displayOrder,
+            displayOrder: nextOrder++,
             onProgress: (progress) {
               if (!mounted) return;
               setState(() {
                 _uploadProgress = progress;
-                _uploadLabel = 'Uploading ${type.toUpperCase()}...';
               });
             },
           );
         }
 
         if (!mounted) return;
-        _message('${type.toUpperCase()} uploaded successfully.');
-        await _refresh();
-      } finally {
-        titleController.dispose();
-        orderController.dispose();
+        setState(() {
+          _uploadCompleted++;
+          _uploadProgress = 1;
+        });
       }
+
+      if (!mounted) return;
+      _message(
+        '${files.length} ${type.toUpperCase()} file${files.length == 1 ? '' : 's'} uploaded successfully.',
+      );
+      await _refresh();
     } catch (e) {
       if (mounted) _message('Upload failed: $e', error: true);
     } finally {
       if (mounted) {
         setState(() {
           _busy = false;
+          _uploadProgress = null;
+          _uploadLabel = null;
+          _uploadCurrentFile = '';
+          _uploadCompleted = 0;
+          _uploadTotal = 0;
         });
       }
     }
