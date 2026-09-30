@@ -19,6 +19,8 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
   final LectureContentService _filesService = LectureContentService();
   late Future<_Data> _future;
   bool _busy = false;
+  double? _uploadProgress;
+  String? _uploadLabel;
 
   @override
   void initState() {
@@ -69,6 +71,8 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
     final extensions = _extensionsForType(type);
     setState(() {
       _busy = true;
+      _uploadProgress = null;
+      _uploadLabel = 'Preparing upload...';
     });
 
     try {
@@ -155,6 +159,13 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
             title: details.title,
             file: picked,
             displayOrder: details.displayOrder,
+            onProgress: (progress) {
+              if (!mounted) return;
+              setState(() {
+                _uploadProgress = progress;
+                _uploadLabel = 'Uploading VIDEO...';
+              });
+            },
           );
         } else {
           final bytes = picked.bytes;
@@ -170,6 +181,13 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
             bytes: bytes,
             fileName: picked.name,
             displayOrder: details.displayOrder,
+            onProgress: (progress) {
+              if (!mounted) return;
+              setState(() {
+                _uploadProgress = progress;
+                _uploadLabel = 'Uploading ${type.toUpperCase()}...';
+              });
+            },
           );
         }
 
@@ -203,6 +221,8 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
     final extensions = _extensionsForType(file.fileType);
     setState(() {
       _busy = true;
+      _uploadProgress = null;
+      _uploadLabel = 'Preparing replacement...';
     });
 
     try {
@@ -422,6 +442,32 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
               ]),
             ),
             const SizedBox(height: 12),
+            if (_busy) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 10, 24, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (_uploadLabel != null)
+                      Text(
+                        _uploadLabel!,
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    const SizedBox(height: 6),
+                    LinearProgressIndicator(value: _uploadProgress),
+                    const SizedBox(height: 4),
+                    if (_uploadProgress != null)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(
+                          '${(_uploadProgress! * 100).toInt()}%',
+                          style: theme.textTheme.labelSmall,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
             const Divider(height: 1),
             Expanded(
               child: RefreshIndicator(
