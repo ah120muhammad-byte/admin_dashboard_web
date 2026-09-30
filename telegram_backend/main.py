@@ -143,7 +143,6 @@ async def require_admin_user(user: dict = Depends(current_supabase_user)) -> dic
     if role != "admin":
         raise HTTPException(status_code=403, detail="Admin role is required")
 
-    user['_access_token'] = access_token
     return user
 
 
