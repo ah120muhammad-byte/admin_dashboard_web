@@ -641,11 +641,6 @@ class _Data {
   const _Data({required this.lectures, required this.files});
 }
 
-class _FileDetails {
-  final String title;
-  final int displayOrder;
-  const _FileDetails({required this.title, required this.displayOrder});
-}
 
 class _Stat extends StatelessWidget {
   final String label;
