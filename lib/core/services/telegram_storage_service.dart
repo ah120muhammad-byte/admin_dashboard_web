@@ -1,4 +1,4 @@
-import 'package:dio/dio.dart';
+import 'package:dio/dio.dart' as dio;
 import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -27,13 +27,13 @@ class TelegramStorageService {
   );
 
   final SupabaseClient _supabase;
-  final Dio _dio;
+  final dio.Dio _dio;
 
   TelegramStorageService({
     SupabaseClient? supabase,
-    Dio? dio,
+    dio.Dio? dio,
   })  : _supabase = supabase ?? Supabase.instance.client,
-        _dio = dio ?? Dio();
+        _dio = dio ?? dio.Dio();
 
   String get _baseUrl {
     final value = backendUrl.trim().replaceFirst(RegExp(r'/+$'), '');
@@ -64,8 +64,8 @@ class TelegramStorageService {
       );
     }
 
-    final form = FormData.fromMap({
-      'file': MultipartFile(
+    final form = dio.FormData.fromMap({
+      'file': dio.MultipartFile(
         stream,
         file.size,
         filename: file.name,
@@ -79,7 +79,7 @@ class TelegramStorageService {
         'lecture_id': lectureId,
       },
       data: form,
-      options: Options(
+      options: dio.Options(
         headers: {'Authorization': 'Bearer $token'},
         contentType: 'multipart/form-data',
         validateStatus: (status) =>
