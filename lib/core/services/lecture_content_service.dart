@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 
 import 'google_drive_service.dart';
+import 'telegram_storage_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ContentLecture {
@@ -48,6 +49,12 @@ class LectureFileItem {
   final bool isActive;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final String storageProvider;
+  final String? telegramChatId;
+  final int? telegramMessageId;
+  final String? telegramFileId;
+  final String? telegramFileUniqueId;
+  final int? fileSize;
 
   const LectureFileItem({
     required this.id,
@@ -59,6 +66,12 @@ class LectureFileItem {
     required this.isActive,
     this.createdAt,
     this.updatedAt,
+    this.storageProvider = 'supabase',
+    this.telegramChatId,
+    this.telegramMessageId,
+    this.telegramFileId,
+    this.telegramFileUniqueId,
+    this.fileSize,
   });
 
   factory LectureFileItem.fromMap(Map<String, dynamic> map) {
@@ -76,6 +89,12 @@ class LectureFileItem {
       updatedAt: map['updated_at'] != null
           ? DateTime.tryParse(map['updated_at'].toString())
           : null,
+      storageProvider: map['storage_provider']?.toString() ?? 'supabase',
+      telegramChatId: map['telegram_chat_id']?.toString(),
+      telegramMessageId: (map['telegram_message_id'] as num?)?.toInt(),
+      telegramFileId: map['telegram_file_id']?.toString(),
+      telegramFileUniqueId: map['telegram_file_unique_id']?.toString(),
+      fileSize: (map['file_size'] as num?)?.toInt(),
     );
   }
 }
@@ -83,12 +102,15 @@ class LectureFileItem {
 class LectureContentService {
   final SupabaseClient _supabase;
   final GoogleDriveService _googleDrive;
+  final TelegramStorageService _telegram;
 
   LectureContentService({
     SupabaseClient? supabase,
     GoogleDriveService? googleDrive,
+    TelegramStorageService? telegram,
   })  : _supabase = supabase ?? Supabase.instance.client,
-        _googleDrive = googleDrive ?? GoogleDriveService();
+        _googleDrive = googleDrive ?? GoogleDriveService(),
+        _telegram = telegram ?? TelegramStorageService();
 
   Future<void> authorizeGoogleDrive() async {
     await _googleDrive.authorize();
@@ -124,7 +146,7 @@ class LectureContentService {
     final response = await _supabase
         .from('lecture_files')
         .select(
-          'id, lecture_id, title, file_type, file_url, display_order, is_active, created_at, updated_at',
+          'id, lecture_id, title, file_type, file_url, display_order, is_active, created_at, updated_at, storage_provider, telegram_chat_id, telegram_message_id, telegram_file_id, telegram_file_unique_id, file_size',
         )
         .order('display_order', ascending: true);
 
@@ -148,6 +170,11 @@ class LectureContentService {
   }
 
   Future<String> createFileUrl(LectureFileItem file) async {
+    if (file.storageProvider == 'telegram' || file.telegramFileId?.isNotEmpty == true || file.fileUrl.startsWith('telegram:')) {
+      final fileId = file.telegramFileId ?? _telegramFileIdFromUrl(file.fileUrl);
+      return _telegram.buildProxyUrl(fileId);
+    }
+
     if (_isGoogleDriveFile(file.fileUrl)) {
       final fileId = _googleDriveFileId(file.fileUrl);
       if (fileId.isEmpty) {
@@ -256,8 +283,10 @@ class LectureContentService {
     int? displayOrder,
     void Function(double progress)? onProgress,
   }) async {
-    final result = await _googleDrive.uploadVideo(
-      file,
+    final result = await _telegram.uploadVideo(
+      file: file,
+      lectureId: lectureId,
+      title: title,
       onProgress: onProgress,
     );
 
@@ -268,14 +297,18 @@ class LectureContentService {
         'lecture_id': lectureId,
         'title': title,
         'file_type': 'video',
-        'file_url': 'gdrive:${result.fileId}',
+        'file_url': _telegram.buildFileUrl(result.fileId),
         'display_order': order,
         'is_active': true,
+        'storage_provider': 'telegram',
+        'telegram_chat_id': result.chatId,
+        'telegram_message_id': result.messageId,
+        'telegram_file_id': result.fileId,
+        'telegram_file_unique_id': result.fileUniqueId,
+        'file_size': result.fileSize,
       });
     } catch (e) {
-      try {
-        await _googleDrive.deleteFile(result.fileId);
-      } catch (_) {}
+      await _telegram.deleteMessage(result.messageId);
       rethrow;
     }
   }
@@ -475,6 +508,12 @@ class LectureContentService {
 
   bool _isGoogleDriveFile(String value) {
     return value.trim().toLowerCase().startsWith('gdrive:');
+  }
+
+  String _telegramFileIdFromUrl(String value) {
+    final trimmed = value.trim();
+    if (!trimmed.startsWith('telegram:')) return '';
+    return trimmed.substring('telegram:'.length).trim();
   }
 
   String _telegramFileIdFromUrl(String value) {
