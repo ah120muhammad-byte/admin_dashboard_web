@@ -518,12 +518,6 @@ class LectureContentService {
     return trimmed.substring('telegram:'.length).trim();
   }
 
-  String _telegramFileIdFromUrl(String value) {
-    final trimmed = value.trim();
-    if (!trimmed.startsWith('telegram:')) return '';
-    return trimmed.substring('telegram:'.length).trim();
-  }
-
   String _googleDriveFileId(String value) {
     if (!_isGoogleDriveFile(value)) return '';
     return value.trim().substring('gdrive:'.length).trim();
