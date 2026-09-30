@@ -75,21 +75,17 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: extensions,
-        withData: true,
+        withData: type != 'video',
+        withReadStream: type == 'video',
       );
       if (!mounted || result == null || result.files.isEmpty) return;
 
       final picked = result.files.single;
-      final bytes = picked.bytes;
-      if (bytes == null || bytes.isEmpty) {
-        _message('Unable to read the selected file.', error: true);
-        return;
-      }
-
       final titleController = TextEditingController(
         text: picked.name.replaceFirst(RegExp(r'\.[^.]+$'), ''),
       );
-      final orderController = TextEditingController(text: '${await _nextOrder(lecture.id)}');
+      final orderController =
+          TextEditingController(text: '${await _nextOrder(lecture.id)}');
       final key = GlobalKey<FormState>();
 
       try {
@@ -106,42 +102,77 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
                   TextFormField(
                     controller: titleController,
                     decoration: const InputDecoration(labelText: 'File Title'),
-                    validator: (v) => v == null || v.trim().isEmpty ? 'Title is required' : null,
+                    validator: (v) =>
+                        v == null || v.trim().isEmpty ? 'Title is required' : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
                     controller: orderController,
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(labelText: 'Display Order'),
-                    validator: (v) => int.tryParse(v?.trim() ?? '') == null ? 'Enter a valid number' : null,
+                    validator: (v) => int.tryParse(v?.trim() ?? '') == null
+                        ? 'Enter a valid number'
+                        : null,
                   ),
                 ],
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Cancel'),
+              ),
               FilledButton(
                 onPressed: () {
                   if (!key.currentState!.validate()) return;
-                  Navigator.pop(dialogContext, _FileDetails(
-                    title: titleController.text.trim(),
-                    displayOrder: int.parse(orderController.text.trim()),
-                  ));
+                  Navigator.pop(
+                    dialogContext,
+                    _FileDetails(
+                      title: titleController.text.trim(),
+                      displayOrder: int.parse(orderController.text.trim()),
+                    ),
+                  );
                 },
                 child: const Text('Upload'),
               ),
             ],
           ),
         );
+
         if (!mounted || details == null) return;
-        await _filesService.addLectureFile(
-          lectureId: lecture.id,
-          title: details.title,
-          fileType: type,
-          bytes: bytes,
-          fileName: picked.name,
-          displayOrder: details.displayOrder,
-        );
+
+        if (type == 'video') {
+          if (picked.readStream == null) {
+            _message(
+              'Unable to stream the selected video. Please select it again.',
+              error: true,
+            );
+            return;
+          }
+
+          await _filesService.addLectureVideo(
+            lectureId: lecture.id,
+            title: details.title,
+            file: picked,
+            displayOrder: details.displayOrder,
+          );
+        } else {
+          final bytes = picked.bytes;
+          if (bytes == null || bytes.isEmpty) {
+            _message('Unable to read the selected file.', error: true);
+            return;
+          }
+
+          await _filesService.addLectureFile(
+            lectureId: lecture.id,
+            title: details.title,
+            fileType: type,
+            bytes: bytes,
+            fileName: picked.name,
+            displayOrder: details.displayOrder,
+          );
+        }
+
         if (!mounted) return;
         _message('${type.toUpperCase()} uploaded successfully.');
         await _refresh();
@@ -178,23 +209,20 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: extensions,
-        withData: true,
+        withData: file.fileType != 'video',
+        withReadStream: file.fileType == 'video',
       );
       if (!mounted || result == null || result.files.isEmpty) return;
 
       final picked = result.files.single;
-      final bytes = picked.bytes;
-      if (bytes == null || bytes.isEmpty) {
-        _message('Unable to read the selected file.', error: true);
-        return;
-      }
 
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (dialogContext) => AlertDialog(
           title: const Text('Replace File'),
           content: Text(
-            'Replace "${file.title}" with "${picked.name}"? The old storage file will be removed after the new file is linked.',
+            'Replace "${file.title}" with "${picked.name}"? '
+            'The old storage file will be removed after the new file is linked.',
           ),
           actions: [
             TextButton(
@@ -211,11 +239,32 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
 
       if (!mounted || confirmed != true) return;
 
-      await _filesService.replaceLectureFile(
-        file: file,
-        bytes: bytes,
-        newFileName: picked.name,
-      );
+      if (file.fileType == 'video') {
+        if (picked.readStream == null) {
+          _message(
+            'Unable to stream the selected video. Please select it again.',
+            error: true,
+          );
+          return;
+        }
+
+        await _filesService.replaceLectureVideo(
+          file: file,
+          newFile: picked,
+        );
+      } else {
+        final bytes = picked.bytes;
+        if (bytes == null || bytes.isEmpty) {
+          _message('Unable to read the selected file.', error: true);
+          return;
+        }
+
+        await _filesService.replaceLectureFile(
+          file: file,
+          bytes: bytes,
+          newFileName: picked.name,
+        );
+      }
 
       if (!mounted) return;
       _message('${file.fileType.toUpperCase()} replaced successfully.');
