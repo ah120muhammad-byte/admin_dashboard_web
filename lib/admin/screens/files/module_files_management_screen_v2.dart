@@ -271,6 +271,13 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
         await _filesService.replaceLectureVideo(
           file: file,
           newFile: picked,
+          onProgress: (progress) {
+            if (!mounted) return;
+            setState(() {
+              _uploadProgress = progress;
+              _uploadLabel = 'Replacing VIDEO...';
+            });
+          },
         );
       } else {
         final bytes = picked.bytes;
@@ -295,6 +302,8 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
       if (mounted) {
         setState(() {
           _busy = false;
+          _uploadProgress = null;
+          _uploadLabel = null;
         });
       }
     }
