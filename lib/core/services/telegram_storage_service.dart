@@ -31,9 +31,9 @@ class TelegramStorageService {
 
   TelegramStorageService({
     SupabaseClient? supabase,
-    dio.Dio? dio,
+    dio.Dio? dioClient,
   })  : _supabase = supabase ?? Supabase.instance.client,
-        _dio = dio ?? dio.Dio();
+        _dio = dioClient ?? dio.Dio();
 
   String get _baseUrl {
     final value = backendUrl.trim().replaceFirst(RegExp(r'/+$'), '');
@@ -116,7 +116,7 @@ class TelegramStorageService {
     try {
       await _dio.delete<void>(
         '$_baseUrl/api/telegram/message/$messageId',
-        options: Options(
+        options: dio.Options(
           headers: {'Authorization': 'Bearer $token'},
           validateStatus: (status) =>
               status != null && status >= 200 && status < 300,
