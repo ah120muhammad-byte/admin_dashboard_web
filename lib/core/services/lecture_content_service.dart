@@ -159,7 +159,7 @@ class LectureContentService {
     final response = await _supabase
         .from('lecture_files')
         .select(
-          'id, lecture_id, title, file_type, file_url, display_order, is_active, created_at, updated_at',
+          'id, lecture_id, title, file_type, file_url, display_order, is_active, created_at, updated_at, storage_provider, telegram_chat_id, telegram_message_id, telegram_file_id, telegram_file_unique_id, file_size',
         )
         .eq('lecture_id', lectureId)
         .order('display_order', ascending: true);
