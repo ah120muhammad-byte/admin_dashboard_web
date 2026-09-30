@@ -1,3 +1,4 @@
+import mimetypes
 import os
 import re
 import shutil
@@ -7,7 +8,8 @@ from typing import Optional
 
 import httpx
 from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 TELEGRAM_LOCAL_PORT = int(os.getenv("TELEGRAM_LOCAL_PORT", "8081"))
 TELEGRAM_API = f"http://127.0.0.1:{TELEGRAM_LOCAL_PORT}"
@@ -26,7 +28,15 @@ ALLOWED_EXTENSIONS = {
     ".mp4", ".mov", ".m4v", ".webm", ".avi", ".mkv"
 }
 
-app = FastAPI(title="MediData Telegram Video Backend", version="1.0.0")
+app = FastAPI(title="MediData Telegram Video Backend", version="1.1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 def require_base_env() -> None:
@@ -179,6 +189,90 @@ async def health() -> JSONResponse:
             "bot_username": bot.get("username") if bot else None,
         }
     )
+
+
+@app.get("/api/telegram/file/{file_id}")
+async def telegram_file(
+    file_id: str,
+    user: dict = Depends(current_supabase_user),
+) -> FileResponse:
+    require_base_env()
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(
+                f"{TELEGRAM_API}/bot{TELEGRAM_BOT_TOKEN}/getFile",
+                params={"file_id": file_id},
+            )
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail="Could not reach local Telegram Bot API") from exc
+
+    try:
+        data = response.json()
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail="Invalid Telegram response") from exc
+
+    if response.status_code != 200 or not data.get("ok"):
+        raise HTTPException(
+            status_code=404,
+            detail=data.get("description", "Telegram file was not found"),
+        )
+
+    file_path = str((data.get("result") or {}).get("file_path") or "").strip()
+    if not file_path:
+        raise HTTPException(status_code=404, detail="Telegram did not return a local file path")
+
+    local_path = Path(file_path).resolve()
+    allowed_roots = [
+        Path("/var/lib/telegram-bot-api").resolve(),
+        Path("/tmp/telegram-bot-api").resolve(),
+    ]
+    if not any(local_path == root or root in local_path.parents for root in allowed_roots):
+        raise HTTPException(status_code=403, detail="Telegram file path is outside the local API storage")
+    if not local_path.is_file():
+        raise HTTPException(status_code=404, detail="Telegram file is not available on the local API server")
+
+    media_type = mimetypes.guess_type(local_path.name)[0] or "application/octet-stream"
+    return FileResponse(
+        path=local_path,
+        media_type=media_type,
+        filename=local_path.name,
+        content_disposition_type="inline",
+        headers={"Cache-Control": "private, max-age=300"},
+    )
+
+
+@app.delete("/api/telegram/message/{message_id}")
+async def delete_telegram_message(
+    message_id: int,
+    user: dict = Depends(current_supabase_user),
+) -> JSONResponse:
+    require_upload_env()
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.post(
+                f"{TELEGRAM_API}/bot{TELEGRAM_BOT_TOKEN}/deleteMessage",
+                json={
+                    "chat_id": TELEGRAM_CHANNEL_ID,
+                    "message_id": message_id,
+                },
+            )
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail="Could not reach local Telegram Bot API") from exc
+
+    try:
+        data = response.json()
+    except ValueError:
+        data = {"ok": False, "description": response.text[:1000]}
+
+    if response.status_code != 200 or not data.get("ok"):
+        raise HTTPException(
+            status_code=502,
+            detail=data.get("description", "Telegram rejected message deletion"),
+        )
+
+    return JSONResponse({"ok": True, "message_id": message_id, "deleted_by": user.get("id")})
 
 
 @app.get("/api/telegram/channels")
