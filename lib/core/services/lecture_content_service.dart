@@ -316,11 +316,13 @@ class LectureContentService {
   Future<void> replaceLectureVideo({
     required LectureFileItem file,
     required PlatformFile newFile,
+    void Function(double progress)? onProgress,
   }) async {
     final result = await _telegram.uploadVideo(
       file: newFile,
       lectureId: file.lectureId,
       title: _titleFromFileName(newFile.name),
+      onProgress: onProgress,
     );
 
     final newTitle = _titleFromFileName(newFile.name);
