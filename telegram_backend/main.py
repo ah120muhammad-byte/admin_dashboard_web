@@ -106,6 +106,7 @@ async def current_supabase_user(
     if ALLOWED_ADMIN_USER_IDS and user_id not in ALLOWED_ADMIN_USER_IDS:
         raise HTTPException(status_code=403, detail="User is not allowed to upload videos")
 
+    user['_access_token'] = access_token
     return user
 
 
