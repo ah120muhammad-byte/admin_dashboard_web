@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -444,6 +446,17 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
                         _uploadLabel!,
                         style: theme.textTheme.bodySmall,
                       ),
+                    if (_uploadCurrentFile.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        _uploadCurrentFile,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 6),
                     LinearProgressIndicator(value: _uploadProgress),
                     const SizedBox(height: 4),
