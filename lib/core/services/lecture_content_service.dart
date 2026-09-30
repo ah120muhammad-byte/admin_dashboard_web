@@ -284,48 +284,47 @@ class LectureContentService {
     required LectureFileItem file,
     required PlatformFile newFile,
   }) async {
-    if (!_isGoogleDriveFile(file.fileUrl)) {
-      throw Exception('This video is not stored on Google Drive.');
-    }
+    final result = await _telegram.uploadVideo(
+      file: newFile,
+      lectureId: file.lectureId,
+      title: _titleFromFileName(newFile.name),
+    );
 
-    final result = await _googleDrive.uploadVideo(newFile);
+    final newTitle = _titleFromFileName(newFile.name);
 
     try {
-      final newTitle = _titleFromFileName(newFile.name);
-      await _supabase
-          .from('lecture_files')
-          .update({
-            'file_url': 'gdrive:${result.fileId}',
-            'title': newTitle,
-            'updated_at': DateTime.now().toUtc().toIso8601String(),
-          })
-          .eq('id', file.id);
+      await _supabase.from('lecture_files').update({
+        'file_url': _telegram.buildFileUrl(result.fileId),
+        'title': newTitle,
+        'storage_provider': 'telegram',
+        'telegram_chat_id': result.chatId,
+        'telegram_message_id': result.messageId,
+        'telegram_file_id': result.fileId,
+        'telegram_file_unique_id': result.fileUniqueId,
+        'file_size': result.fileSize,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      }).eq('id', file.id);
 
       final verification = await _supabase
           .from('lecture_files')
-          .select('id, file_url, title')
+          .select('id, file_url, title, telegram_file_id')
           .eq('id', file.id)
           .maybeSingle();
 
       if (verification == null ||
-          verification['file_url']?.toString() != 'gdrive:${result.fileId}' ||
+          verification['telegram_file_id']?.toString() != result.fileId ||
           verification['title']?.toString() != newTitle) {
         throw Exception(
-          'The new Google Drive video was uploaded, but the lecture record was not updated correctly.',
+          'The new Telegram video was uploaded, but the lecture record was not updated correctly.',
         );
       }
     } catch (e) {
-      try {
-        await _googleDrive.deleteFile(result.fileId);
-      } catch (_) {}
+      await _telegram.deleteMessage(result.messageId);
       rethrow;
     }
 
-    final oldId = _googleDriveFileId(file.fileUrl);
-    if (oldId.isNotEmpty && oldId != result.fileId) {
-      try {
-        await _googleDrive.deleteFile(oldId);
-      } catch (_) {}
+    if (file.telegramMessageId != null) {
+      await _telegram.deleteMessage(file.telegramMessageId!);
     }
   }
 
@@ -447,6 +446,14 @@ class LectureContentService {
   }
 
   Future<void> deleteLectureFile({required LectureFileItem file}) async {
+    if (file.storageProvider == 'telegram' || file.telegramMessageId != null || file.fileUrl.startsWith('telegram:')) {
+      if (file.telegramMessageId != null) {
+        await _telegram.deleteMessage(file.telegramMessageId!);
+      }
+      await _supabase.from('lecture_files').delete().eq('id', file.id);
+      return;
+    }
+
     if (_isGoogleDriveFile(file.fileUrl)) {
       final fileId = _googleDriveFileId(file.fileUrl);
       if (fileId.isNotEmpty) {
@@ -468,6 +475,12 @@ class LectureContentService {
 
   bool _isGoogleDriveFile(String value) {
     return value.trim().toLowerCase().startsWith('gdrive:');
+  }
+
+  String _telegramFileIdFromUrl(String value) {
+    final trimmed = value.trim();
+    if (!trimmed.startsWith('telegram:')) return '';
+    return trimmed.substring('telegram:'.length).trim();
   }
 
   String _googleDriveFileId(String value) {
