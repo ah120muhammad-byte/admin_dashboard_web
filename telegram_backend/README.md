@@ -8,6 +8,8 @@ This service is a server-side bridge between the MediData Admin Dashboard and a 
 - Writes the upload to a temporary local file in chunks.
 - Uses Telegram Local Bot API to send the file to the private channel.
 - Returns the Telegram message/file identifiers.
+- Proxies Telegram-hosted files to authenticated student/admin clients without exposing the bot token.
+- Supports deleting the backing channel message when the Telegram message is still deletable.
 - Never exposes the Telegram bot token to Flutter Web.
 
 Telegram Local Bot API is required for videos larger than the normal Bot API upload limit.
@@ -69,6 +71,14 @@ The response includes:
 - file_unique_id
 - file_name
 - file_size
+
+File proxy:
+GET /api/telegram/file/{file_id}
+Authentication: Authorization: Bearer <Supabase access token>
+
+Delete backing message:
+DELETE /api/telegram/message/{message_id}
+Authentication: Authorization: Bearer <Supabase access token>
 
 These values will later be stored in Supabase lecture_files so the student app can stream/download the Telegram-hosted video without exposing the bot token.
 
