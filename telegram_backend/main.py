@@ -38,7 +38,7 @@ app.add_middleware(
     allow_origins=[
         "https://admin-dashboard-no15i2cjd-medi-data-team.vercel.app",
     ],
-    allow_origin_regex=r"https://.*\\.vercel\\.app$",
+    allow_origin_regex=r"https://.*\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept", "Origin"],
