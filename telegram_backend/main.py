@@ -351,6 +351,14 @@ async def telegram_channels(
     return JSONResponse({"ok": True, "channels": list(channels.values()), "requested_by": user.get("id")})
 
 
+@app.options("/api/upload/video")
+async def upload_video_options() -> JSONResponse:
+    # Explicitly handle the browser preflight at the upload route as well as
+    # through CORSMiddleware. This keeps the endpoint friendly to proxies that
+    # do not forward OPTIONS requests to the normal POST route.
+    return JSONResponse({"ok": True})
+
+
 @app.post("/api/upload/video")
 async def upload_video(
     file: UploadFile = File(...),
