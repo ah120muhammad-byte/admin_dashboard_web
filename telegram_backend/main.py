@@ -3,6 +3,7 @@ import os
 import re
 import shutil
 import tempfile
+import traceback
 from pathlib import Path
 from typing import Optional
 
@@ -24,15 +25,10 @@ ALLOWED_ADMIN_USER_IDS = {
 }
 
 MAX_UPLOAD_BYTES = 2_000_000_000
-ALLOWED_EXTENSIONS = {
-    ".mp4", ".mov", ".m4v", ".webm", ".avi", ".mkv"
-}
+ALLOWED_EXTENSIONS = {".mp4", ".mov", ".m4v", ".webm", ".avi", ".mkv"}
 
-app = FastAPI(title="MediData Telegram Video Backend", version="1.1.1")
+app = FastAPI(title="MediData Telegram Video Backend", version="1.1.2")
 
-# The admin dashboard runs on Vercel and sends an Authorization header.
-# Explicitly allow the browser origins that can call this API so the
-# browser's OPTIONS preflight succeeds before the real upload request.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -113,8 +109,6 @@ async def current_supabase_user(
     if ALLOWED_ADMIN_USER_IDS and user_id not in ALLOWED_ADMIN_USER_IDS:
         raise HTTPException(status_code=403, detail="User is not allowed to upload videos")
 
-    # Keep the validated token so require_admin_user can use the same
-    # authenticated session when checking the profile role.
     user["_access_token"] = access_token
     return user
 
@@ -128,11 +122,7 @@ async def require_admin_user(user: dict = Depends(current_supabase_user)) -> dic
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
                 f"{SUPABASE_URL}/rest/v1/profiles",
-                params={
-                    "select": "role",
-                    "id": f"eq.{user_id}",
-                    "limit": "1",
-                },
+                params={"select": "role", "id": f"eq.{user_id}", "limit": "1"},
                 headers={
                     "Authorization": f"Bearer {user.get('_access_token', '')}",
                     "apikey": SUPABASE_ANON_KEY,
@@ -159,9 +149,7 @@ async def require_admin_user(user: dict = Depends(current_supabase_user)) -> dic
 def safe_filename(name: str) -> str:
     name = Path(name or "video.mp4").name
     name = re.sub(r"[^A-Za-z0-9._ -]+", "_", name).strip()
-    if not name:
-        name = "video.mp4"
-    return name[:180]
+    return (name or "video.mp4")[:180]
 
 
 async def send_local_document(file_path: Path, filename: str, caption: str = "") -> dict:
@@ -181,12 +169,22 @@ async def send_local_document(file_path: Path, filename: str, caption: str = "")
                 json=payload,
             )
     except httpx.HTTPError as exc:
-        raise HTTPException(status_code=502, detail="Could not reach local Telegram Bot API") from exc
+        print(f"[telegram] HTTP error while sending {filename}: {exc}", flush=True)
+        raise HTTPException(
+            status_code=502,
+            detail=f"Could not reach local Telegram Bot API: {type(exc).__name__}",
+        ) from exc
 
     try:
         data = response.json()
     except ValueError:
         data = {"ok": False, "description": response.text[:1000]}
+
+    print(
+        f"[telegram] sendDocument status={response.status_code} ok={data.get('ok')} "
+        f"file={filename} size={file_path.stat().st_size if file_path.exists() else 'unknown'}",
+        flush=True,
+    )
 
     if response.status_code != 200 or not data.get("ok"):
         raise HTTPException(
@@ -199,13 +197,11 @@ async def send_local_document(file_path: Path, filename: str, caption: str = "")
 
 @app.get("/")
 async def root() -> JSONResponse:
-    return JSONResponse(
-        {
-            "service": "MediData Telegram Video Backend",
-            "status": "ok",
-            "telegram_local_api": TELEGRAM_API,
-        }
-    )
+    return JSONResponse({
+        "service": "MediData Telegram Video Backend",
+        "status": "ok",
+        "telegram_local_api": TELEGRAM_API,
+    })
 
 
 @app.get("/health")
@@ -216,9 +212,7 @@ async def health() -> JSONResponse:
 
     try:
         async with httpx.AsyncClient(timeout=8.0) as client:
-            response = await client.get(
-                f"{TELEGRAM_API}/bot{TELEGRAM_BOT_TOKEN}/getMe"
-            )
+            response = await client.get(f"{TELEGRAM_API}/bot{TELEGRAM_BOT_TOKEN}/getMe")
             data = response.json()
             telegram_ok = response.status_code == 200 and data.get("ok", False)
             if telegram_ok:
@@ -228,14 +222,12 @@ async def health() -> JSONResponse:
     except (httpx.HTTPError, ValueError) as exc:
         telegram_error = str(exc)
 
-    return JSONResponse(
-        {
-            "status": "ok",
-            "telegram_local_api": telegram_ok,
-            "telegram_error": telegram_error,
-            "bot_username": bot.get("username") if bot else None,
-        }
-    )
+    return JSONResponse({
+        "status": "ok",
+        "telegram_local_api": telegram_ok,
+        "telegram_error": telegram_error,
+        "bot_username": bot.get("username") if bot else None,
+    })
 
 
 @app.get("/api/telegram/file/{file_id}")
@@ -300,10 +292,7 @@ async def delete_telegram_message(
         async with httpx.AsyncClient(timeout=20.0) as client:
             response = await client.post(
                 f"{TELEGRAM_API}/bot{TELEGRAM_BOT_TOKEN}/deleteMessage",
-                json={
-                    "chat_id": TELEGRAM_CHANNEL_ID,
-                    "message_id": message_id,
-                },
+                json={"chat_id": TELEGRAM_CHANNEL_ID, "message_id": message_id},
             )
     except httpx.HTTPError as exc:
         raise HTTPException(status_code=502, detail="Could not reach local Telegram Bot API") from exc
@@ -333,10 +322,7 @@ async def telegram_channels(
                 params={"limit": 100, "allowed_updates": '["channel_post","my_chat_member"]'},
             )
     except httpx.HTTPError as exc:
-        raise HTTPException(
-            status_code=502,
-            detail="Could not reach local Telegram Bot API",
-        ) from exc
+        raise HTTPException(status_code=502, detail="Could not reach local Telegram Bot API") from exc
 
     try:
         data = response.json()
@@ -361,13 +347,7 @@ async def telegram_channels(
                     "username": chat.get("username"),
                 }
 
-    return JSONResponse(
-        {
-            "ok": True,
-            "channels": list(channels.values()),
-            "requested_by": user.get("id"),
-        }
-    )
+    return JSONResponse({"ok": True, "channels": list(channels.values()), "requested_by": user.get("id")})
 
 
 @app.post("/api/upload/video")
@@ -381,12 +361,8 @@ async def upload_video(
 
     filename = safe_filename(file.filename or "video.mp4")
     extension = Path(filename).suffix.lower()
-
     if extension not in ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported video type: {extension or 'unknown'}",
-        )
+        raise HTTPException(status_code=400, detail=f"Unsupported video type: {extension or 'unknown'}")
 
     temp_dir = Path(tempfile.mkdtemp(prefix="medidata-video-"))
     target = temp_dir / filename
@@ -406,6 +382,12 @@ async def upload_video(
                     )
                 output.write(chunk)
 
+        print(
+            f"[upload] browser upload complete file={filename} size={total} "
+            f"lecture_id={lecture_id or ''} channel_configured={bool(TELEGRAM_CHANNEL_ID)}",
+            flush=True,
+        )
+
         caption_parts = [
             f"MediData video: {title.strip()}" if title and title.strip() else f"MediData video: {filename}",
         ]
@@ -413,28 +395,42 @@ async def upload_video(
             caption_parts.append(f"Lecture ID: {lecture_id.strip()}")
         caption_parts.append(f"Uploaded by: {user.get('email') or user.get('id')}")
 
-        message = await send_local_document(
-            target,
-            filename,
-            "\n".join(caption_parts),
+        message = await send_local_document(target, filename, "\n".join(caption_parts))
+        document = message.get("document") or {}
+
+        print(
+            f"[upload] telegram upload complete message_id={message.get('message_id')} "
+            f"file_id_present={bool(document.get('file_id'))}",
+            flush=True,
         )
 
-        document = message.get("document") or {}
+        return JSONResponse({
+            "ok": True,
+            "provider": "telegram",
+            "chat_id": TELEGRAM_CHANNEL_ID,
+            "message_id": message.get("message_id"),
+            "file_id": document.get("file_id"),
+            "file_unique_id": document.get("file_unique_id"),
+            "file_name": document.get("file_name") or filename,
+            "file_size": document.get("file_size") or total,
+            "uploaded_by": user.get("id"),
+        })
+    except HTTPException:
+        raise
+    except Exception as exc:
+        print(f"[upload] unexpected error for {filename}: {type(exc).__name__}: {exc}", flush=True)
+        traceback.print_exc()
         return JSONResponse(
-            {
-                "ok": True,
-                "provider": "telegram",
-                "chat_id": TELEGRAM_CHANNEL_ID,
-                "message_id": message.get("message_id"),
-                "file_id": document.get("file_id"),
-                "file_unique_id": document.get("file_unique_id"),
-                "file_name": document.get("file_name") or filename,
-                "file_size": document.get("file_size") or total,
-                "uploaded_by": user.get("id"),
-            }
+            status_code=500,
+            content={
+                "ok": False,
+                "error": "UPLOAD_INTERNAL_ERROR",
+                "detail": f"{type(exc).__name__}: {str(exc)[:500]}",
+            },
         )
     finally:
         try:
-            shutil.rmtree(temp_dir, ignore_errors=True)
-        except OSError:
+            await file.close()
+        except Exception:
             pass
+        shutil.rmtree(temp_dir, ignore_errors=True)
