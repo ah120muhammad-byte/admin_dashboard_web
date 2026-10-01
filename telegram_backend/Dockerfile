@@ -1,18 +1,14 @@
-FROM aiogram/telegram-bot-api:latest
-
-RUN apk add --no-cache python3 py3-pip wget
+FROM python:3.12-slim
 
 WORKDIR /app
+
 COPY requirements.txt /app/requirements.txt
-RUN pip3 install --no-cache-dir --break-system-packages -r /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
 COPY main.py /app/main.py
-COPY start.sh /app/start.sh
-RUN chmod +x /app/start.sh
 
-ENV TELEGRAM_LOCAL_PORT=8081
 ENV PYTHONUNBUFFERED=1
 
 EXPOSE 10000
 
-ENTRYPOINT ["/app/start.sh"]
+CMD ["sh", "-c", "python3 -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-10000}"]
