@@ -4,7 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 
 import 'google_drive_service.dart';
-import 'telegram_storage_service.dart';
+import 'r2_storage_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ContentLecture {
@@ -102,15 +102,15 @@ class LectureFileItem {
 class LectureContentService {
   final SupabaseClient _supabase;
   final GoogleDriveService _googleDrive;
-  final TelegramStorageService _telegram;
+  final R2StorageService _r2;
 
   LectureContentService({
     SupabaseClient? supabase,
     GoogleDriveService? googleDrive,
-    TelegramStorageService? telegram,
+    R2StorageService? r2,
   })  : _supabase = supabase ?? Supabase.instance.client,
         _googleDrive = googleDrive ?? GoogleDriveService(),
-        _telegram = telegram ?? TelegramStorageService();
+        _r2 = r2 ?? R2StorageService();
 
   Future<void> authorizeGoogleDrive() async {
     await _googleDrive.authorize();
@@ -170,9 +170,9 @@ class LectureContentService {
   }
 
   Future<String> createFileUrl(LectureFileItem file) async {
-    if (file.storageProvider == 'telegram' || file.telegramFileId?.isNotEmpty == true || file.fileUrl.startsWith('telegram:')) {
-      final fileId = file.telegramFileId ?? _telegramFileIdFromUrl(file.fileUrl);
-      return _telegram.buildProxyUrl(fileId);
+    if (file.storageProvider == 'r2' || file.fileUrl.startsWith('r2:')) {
+      final key = _r2.keyFromFileUrl(file.fileUrl);
+      return _r2.createSignedUrl(key);
     }
 
     if (_isGoogleDriveFile(file.fileUrl)) {
@@ -283,7 +283,7 @@ class LectureContentService {
     int? displayOrder,
     void Function(double progress)? onProgress,
   }) async {
-    final result = await _telegram.uploadVideo(
+    final result = await _r2.uploadVideo(
       file: file,
       lectureId: lectureId,
       title: title,
@@ -297,18 +297,14 @@ class LectureContentService {
         'lecture_id': lectureId,
         'title': title,
         'file_type': 'video',
-        'file_url': _telegram.buildFileUrl(result.fileId),
+        'file_url': _r2.buildFileUrl(result.key),
         'display_order': order,
         'is_active': true,
-        'storage_provider': 'telegram',
-        'telegram_chat_id': result.chatId,
-        'telegram_message_id': result.messageId,
-        'telegram_file_id': result.fileId,
-        'telegram_file_unique_id': result.fileUniqueId,
+        'storage_provider': 'r2',
         'file_size': result.fileSize,
       });
     } catch (e) {
-      await _telegram.deleteMessage(result.messageId);
+      await _r2.deleteObject(result.key);
       rethrow;
     }
   }
@@ -318,7 +314,7 @@ class LectureContentService {
     required PlatformFile newFile,
     void Function(double progress)? onProgress,
   }) async {
-    final result = await _telegram.uploadVideo(
+    final result = await _r2.uploadVideo(
       file: newFile,
       lectureId: file.lectureId,
       title: _titleFromFileName(newFile.name),
@@ -329,37 +325,37 @@ class LectureContentService {
 
     try {
       await _supabase.from('lecture_files').update({
-        'file_url': _telegram.buildFileUrl(result.fileId),
+        'file_url': _r2.buildFileUrl(result.key),
         'title': newTitle,
-        'storage_provider': 'telegram',
-        'telegram_chat_id': result.chatId,
-        'telegram_message_id': result.messageId,
-        'telegram_file_id': result.fileId,
-        'telegram_file_unique_id': result.fileUniqueId,
+        'storage_provider': 'r2',
         'file_size': result.fileSize,
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       }).eq('id', file.id);
 
       final verification = await _supabase
           .from('lecture_files')
-          .select('id, file_url, title, telegram_file_id')
+          .select('id, file_url, title, storage_provider')
           .eq('id', file.id)
           .maybeSingle();
 
       if (verification == null ||
-          verification['telegram_file_id']?.toString() != result.fileId ||
-          verification['title']?.toString() != newTitle) {
+          verification['file_url']?.toString() != _r2.buildFileUrl(result.key) ||
+          verification['title']?.toString() != newTitle ||
+          verification['storage_provider']?.toString() != 'r2') {
         throw Exception(
-          'The new Telegram video was uploaded, but the lecture record was not updated correctly.',
+          'The new R2 video was uploaded, but the lecture record was not updated correctly.',
         );
       }
     } catch (e) {
-      await _telegram.deleteMessage(result.messageId);
+      await _r2.deleteObject(result.key);
       rethrow;
     }
 
-    if (file.telegramMessageId != null) {
-      await _telegram.deleteMessage(file.telegramMessageId!);
+    if (file.storageProvider == 'r2' || file.fileUrl.startsWith('r2:')) {
+      final oldKey = _r2.keyFromFileUrl(file.fileUrl);
+      if (oldKey.isNotEmpty) {
+        await _r2.deleteObject(oldKey);
+      }
     }
   }
 
@@ -481,9 +477,10 @@ class LectureContentService {
   }
 
   Future<void> deleteLectureFile({required LectureFileItem file}) async {
-    if (file.storageProvider == 'telegram' || file.telegramMessageId != null || file.fileUrl.startsWith('telegram:')) {
-      if (file.telegramMessageId != null) {
-        await _telegram.deleteMessage(file.telegramMessageId!);
+    if (file.storageProvider == 'r2' || file.fileUrl.startsWith('r2:')) {
+      final key = _r2.keyFromFileUrl(file.fileUrl);
+      if (key.isNotEmpty) {
+        await _r2.deleteObject(key);
       }
       await _supabase.from('lecture_files').delete().eq('id', file.id);
       return;
@@ -510,12 +507,6 @@ class LectureContentService {
 
   bool _isGoogleDriveFile(String value) {
     return value.trim().toLowerCase().startsWith('gdrive:');
-  }
-
-  String _telegramFileIdFromUrl(String value) {
-    final trimmed = value.trim();
-    if (!trimmed.startsWith('telegram:')) return '';
-    return trimmed.substring('telegram:'.length).trim();
   }
 
   String _googleDriveFileId(String value) {
