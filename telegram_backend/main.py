@@ -1,21 +1,28 @@
-import mimetypes
 import os
 import re
-import shutil
-import tempfile
-import traceback
+import uuid
 from pathlib import Path
 from typing import Optional
 
+import boto3
 import httpx
+from botocore.client import Config
 from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
-TELEGRAM_LOCAL_PORT = int(os.getenv("TELEGRAM_LOCAL_PORT", "8081"))
-TELEGRAM_API = f"http://127.0.0.1:{TELEGRAM_LOCAL_PORT}"
-TELEGRAM_CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID", "").strip()
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+R2_ACCOUNT_ID = os.getenv("R2_ACCOUNT_ID", "").strip()
+R2_ACCESS_KEY_ID = os.getenv("R2_ACCESS_KEY_ID", "").strip()
+R2_SECRET_ACCESS_KEY = os.getenv("R2_SECRET_ACCESS_KEY", "").strip()
+R2_BUCKET_NAME = os.getenv("R2_BUCKET_NAME", "medidata-videos").strip()
+R2_ENDPOINT = (
+    os.getenv("R2_ENDPOINT", "").strip().rstrip("/")
+    or f"https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+    if R2_ACCOUNT_ID
+    else ""
+)
+
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "").strip()
 ALLOWED_ADMIN_USER_IDS = {
@@ -24,17 +31,14 @@ ALLOWED_ADMIN_USER_IDS = {
     if value.strip()
 }
 
-MAX_UPLOAD_BYTES = 2_000_000_000
+MAX_UPLOAD_BYTES = 5_000_000_000_000
+PART_SIZE = 64 * 1024 * 1024
 ALLOWED_EXTENSIONS = {".mp4", ".mov", ".m4v", ".webm", ".avi", ".mkv"}
 
-app = FastAPI(title="MediData Telegram Video Backend", version="1.1.2")
+app = FastAPI(title="MediData R2 Video Backend", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    # The admin dashboard sends the Supabase JWT in the Authorization header.
-    # No browser cookies are used, so credentialed CORS is not required.
-    # Using wildcard origins/headers also avoids failures when Vercel creates
-    # a different deployment hostname.
     allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["*"],
@@ -43,11 +47,13 @@ app.add_middleware(
 )
 
 
-def require_base_env() -> None:
+def require_r2_env() -> None:
     required = {
-        "TELEGRAM_BOT_TOKEN": TELEGRAM_BOT_TOKEN,
-        "SUPABASE_URL": SUPABASE_URL,
-        "SUPABASE_ANON_KEY": SUPABASE_ANON_KEY,
+        "R2_ACCOUNT_ID": R2_ACCOUNT_ID,
+        "R2_ACCESS_KEY_ID": R2_ACCESS_KEY_ID,
+        "R2_SECRET_ACCESS_KEY": R2_SECRET_ACCESS_KEY,
+        "R2_BUCKET_NAME": R2_BUCKET_NAME,
+        "R2_ENDPOINT": R2_ENDPOINT,
     }
     missing = [name for name, value in required.items() if not value]
     if missing:
@@ -57,19 +63,38 @@ def require_base_env() -> None:
         )
 
 
-def require_upload_env() -> None:
-    require_base_env()
-    if not TELEGRAM_CHANNEL_ID:
+def require_supabase_env() -> None:
+    missing = [
+        name
+        for name, value in {
+            "SUPABASE_URL": SUPABASE_URL,
+            "SUPABASE_ANON_KEY": SUPABASE_ANON_KEY,
+        }.items()
+        if not value
+    ]
+    if missing:
         raise HTTPException(
             status_code=500,
-            detail="TELEGRAM_CHANNEL_ID is not configured yet. Discover the channel first.",
+            detail=f"Missing server configuration: {', '.join(missing)}",
         )
+
+
+def r2_client():
+    require_r2_env()
+    return boto3.client(
+        "s3",
+        endpoint_url=R2_ENDPOINT,
+        aws_access_key_id=R2_ACCESS_KEY_ID,
+        aws_secret_access_key=R2_SECRET_ACCESS_KEY,
+        region_name="auto",
+        config=Config(signature_version="s3v4"),
+    )
 
 
 async def current_supabase_user(
     authorization: Optional[str] = Header(default=None),
 ) -> dict:
-    require_base_env()
+    require_supabase_env()
 
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Missing Supabase access token")
@@ -78,16 +103,14 @@ async def current_supabase_user(
     if not access_token:
         raise HTTPException(status_code=401, detail="Invalid access token")
 
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "apikey": SUPABASE_ANON_KEY,
-    }
-
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.get(
                 f"{SUPABASE_URL}/auth/v1/user",
-                headers=headers,
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "apikey": SUPABASE_ANON_KEY,
+                },
             )
     except httpx.HTTPError as exc:
         raise HTTPException(
@@ -103,12 +126,12 @@ async def current_supabase_user(
     except ValueError as exc:
         raise HTTPException(status_code=401, detail="Invalid Supabase auth response") from exc
 
-    user_id = str(user.get("id", ""))
+    user_id = str(user.get("id", "")).strip()
     if not user_id:
         raise HTTPException(status_code=401, detail="Authenticated user ID is missing")
 
     if ALLOWED_ADMIN_USER_IDS and user_id not in ALLOWED_ADMIN_USER_IDS:
-        raise HTTPException(status_code=403, detail="User is not allowed to upload videos")
+        raise HTTPException(status_code=403, detail="User is not allowed to manage videos")
 
     user["_access_token"] = access_token
     return user
@@ -116,9 +139,6 @@ async def current_supabase_user(
 
 async def require_admin_user(user: dict = Depends(current_supabase_user)) -> dict:
     user_id = str(user.get("id", "")).strip()
-    if not user_id:
-        raise HTTPException(status_code=403, detail="Authenticated user ID is missing")
-
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
@@ -140,8 +160,7 @@ async def require_admin_user(user: dict = Depends(current_supabase_user)) -> dic
     except ValueError as exc:
         raise HTTPException(status_code=403, detail="Invalid Supabase profile response") from exc
 
-    role = rows[0].get("role") if rows else None
-    if role != "admin":
+    if not rows or rows[0].get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin role is required")
 
     return user
@@ -153,293 +172,260 @@ def safe_filename(name: str) -> str:
     return (name or "video.mp4")[:180]
 
 
-async def send_local_document(file_path: Path, filename: str, caption: str = "") -> dict:
-    uri = file_path.as_uri()
-    payload = {
-        "chat_id": TELEGRAM_CHANNEL_ID,
-        "document": uri,
-        "disable_content_type_detection": False,
-    }
-    if caption:
-        payload["caption"] = caption[:1024]
+def build_object_key(lecture_id: str, filename: str) -> str:
+    safe = safe_filename(filename).replace(" ", "_")
+    lecture = re.sub(r"[^A-Za-z0-9_-]+", "_", lecture_id.strip()) or "lecture"
+    return f"lectures/{lecture}/{uuid.uuid4().hex}_{safe}"
 
-    try:
-        async with httpx.AsyncClient(timeout=None) as client:
-            response = await client.post(
-                f"{TELEGRAM_API}/bot{TELEGRAM_BOT_TOKEN}/sendDocument",
-                json=payload,
-            )
-    except httpx.HTTPError as exc:
-        print(f"[telegram] HTTP error while sending {filename}: {exc}", flush=True)
-        raise HTTPException(
-            status_code=502,
-            detail=f"Could not reach local Telegram Bot API: {type(exc).__name__}",
-        ) from exc
 
-    try:
-        data = response.json()
-    except ValueError:
-        data = {"ok": False, "description": response.text[:1000]}
+class InitiateMultipartRequest(BaseModel):
+    lecture_id: str
+    filename: str
+    content_type: str = "video/mp4"
+    file_size: int
 
-    print(
-        f"[telegram] sendDocument status={response.status_code} ok={data.get('ok')} "
-        f"file={filename} size={file_path.stat().st_size if file_path.exists() else 'unknown'}",
-        flush=True,
-    )
 
-    if response.status_code != 200 or not data.get("ok"):
-        raise HTTPException(
-            status_code=502,
-            detail=data.get("description", "Telegram rejected the upload"),
-        )
+class PresignPartRequest(BaseModel):
+    key: str
+    upload_id: str
+    part_number: int
 
-    return data["result"]
+
+class CompletedPart(BaseModel):
+    part_number: int
+    etag: str
+
+
+class CompleteMultipartRequest(BaseModel):
+    key: str
+    upload_id: str
+    parts: list[CompletedPart]
+
+
+class AbortMultipartRequest(BaseModel):
+    key: str
+    upload_id: str
+
+
+class SignedUrlRequest(BaseModel):
+    key: str
 
 
 @app.get("/")
 async def root() -> JSONResponse:
     return JSONResponse({
-        "service": "MediData Telegram Video Backend",
+        "service": "MediData R2 Video Backend",
         "status": "ok",
-        "telegram_local_api": TELEGRAM_API,
+        "bucket": R2_BUCKET_NAME,
     })
 
 
 @app.get("/health")
 async def health() -> JSONResponse:
-    telegram_ok = False
-    telegram_error = None
-    bot = None
-
-    try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
-            response = await client.get(f"{TELEGRAM_API}/bot{TELEGRAM_BOT_TOKEN}/getMe")
-            data = response.json()
-            telegram_ok = response.status_code == 200 and data.get("ok", False)
-            if telegram_ok:
-                bot = data.get("result")
-            else:
-                telegram_error = data.get("description", response.text[:500])
-    except (httpx.HTTPError, ValueError) as exc:
-        telegram_error = str(exc)
+    configured = bool(
+        R2_ACCOUNT_ID and R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY
+        and R2_BUCKET_NAME and R2_ENDPOINT
+        and SUPABASE_URL and SUPABASE_ANON_KEY
+    )
+    r2_ok = False
+    r2_error = None
+    if configured:
+        try:
+            r2_client().head_bucket(Bucket=R2_BUCKET_NAME)
+            r2_ok = True
+        except Exception as exc:
+            r2_error = f"{type(exc).__name__}: {str(exc)[:300]}"
 
     return JSONResponse({
         "status": "ok",
-        "telegram_local_api": telegram_ok,
-        "telegram_error": telegram_error,
-        "bot_username": bot.get("username") if bot else None,
+        "r2_configured": configured,
+        "r2_ok": r2_ok,
+        "r2_error": r2_error,
+        "bucket": R2_BUCKET_NAME,
     })
 
 
-@app.get("/api/telegram/file/{file_id}")
-async def telegram_file(
-    file_id: str,
-    user: dict = Depends(current_supabase_user),
-) -> FileResponse:
-    require_base_env()
+@app.post("/api/r2/multipart/initiate")
+async def initiate_multipart(
+    request: InitiateMultipartRequest,
+    user: dict = Depends(require_admin_user),
+) -> JSONResponse:
+    if request.file_size <= 0:
+        raise HTTPException(status_code=400, detail="File size must be greater than zero")
+    if request.file_size > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Video exceeds the R2 maximum supported size")
+
+    filename = safe_filename(request.filename)
+    if Path(filename).suffix.lower() not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Unsupported video type")
+
+    key = build_object_key(request.lecture_id, filename)
+    content_type = request.content_type.strip() or "video/mp4"
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(
-                f"{TELEGRAM_API}/bot{TELEGRAM_BOT_TOKEN}/getFile",
-                params={"file_id": file_id},
-            )
-    except httpx.HTTPError as exc:
-        raise HTTPException(status_code=502, detail="Could not reach local Telegram Bot API") from exc
-
-    try:
-        data = response.json()
-    except ValueError as exc:
-        raise HTTPException(status_code=502, detail="Invalid Telegram response") from exc
-
-    if response.status_code != 200 or not data.get("ok"):
-        raise HTTPException(
-            status_code=404,
-            detail=data.get("description", "Telegram file was not found"),
+        result = r2_client().create_multipart_upload(
+            Bucket=R2_BUCKET_NAME,
+            Key=key,
+            ContentType=content_type,
+            Metadata={
+                "lecture-id": request.lecture_id[:200],
+                "uploaded-by": str(user.get("id", ""))[:200],
+                "original-filename": filename[:200],
+            },
         )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"R2 could not start the multipart upload: {type(exc).__name__}",
+        ) from exc
 
-    file_path = str((data.get("result") or {}).get("file_path") or "").strip()
-    if not file_path:
-        raise HTTPException(status_code=404, detail="Telegram did not return a local file path")
+    return JSONResponse({
+        "ok": True,
+        "key": key,
+        "upload_id": result["UploadId"],
+        "part_size": PART_SIZE,
+        "file_name": filename,
+        "file_size": request.file_size,
+    })
 
-    local_path = Path(file_path).resolve()
-    allowed_roots = [
-        Path("/var/lib/telegram-bot-api").resolve(),
-        Path("/tmp/telegram-bot-api").resolve(),
+
+@app.post("/api/r2/multipart/part-url")
+async def presign_part(
+    request: PresignPartRequest,
+    user: dict = Depends(require_admin_user),
+) -> JSONResponse:
+    if request.part_number < 1 or request.part_number > 10000:
+        raise HTTPException(status_code=400, detail="Invalid part number")
+    if not request.key.startswith("lectures/"):
+        raise HTTPException(status_code=403, detail="Invalid R2 object key")
+
+    try:
+        url = r2_client().generate_presigned_url(
+            "upload_part",
+            Params={
+                "Bucket": R2_BUCKET_NAME,
+                "Key": request.key,
+                "UploadId": request.upload_id,
+                "PartNumber": request.part_number,
+            },
+            ExpiresIn=3600,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"R2 could not create a signed part URL: {type(exc).__name__}",
+        ) from exc
+
+    return JSONResponse({"ok": True, "url": url})
+
+
+@app.post("/api/r2/multipart/complete")
+async def complete_multipart(
+    request: CompleteMultipartRequest,
+    user: dict = Depends(require_admin_user),
+) -> JSONResponse:
+    if not request.key.startswith("lectures/") or not request.parts:
+        raise HTTPException(status_code=400, detail="Invalid multipart completion request")
+
+    parts = [
+        {"PartNumber": part.part_number, "ETag": part.etag}
+        for part in sorted(request.parts, key=lambda p: p.part_number)
     ]
-    if not any(local_path == root or root in local_path.parents for root in allowed_roots):
-        raise HTTPException(status_code=403, detail="Telegram file path is outside the local API storage")
-    if not local_path.is_file():
-        raise HTTPException(status_code=404, detail="Telegram file is not available on the local API server")
-
-    media_type = mimetypes.guess_type(local_path.name)[0] or "application/octet-stream"
-    return FileResponse(
-        path=local_path,
-        media_type=media_type,
-        filename=local_path.name,
-        content_disposition_type="inline",
-        headers={"Cache-Control": "private, max-age=300"},
-    )
-
-
-@app.delete("/api/telegram/message/{message_id}")
-async def delete_telegram_message(
-    message_id: int,
-    user: dict = Depends(require_admin_user),
-) -> JSONResponse:
-    require_upload_env()
 
     try:
-        async with httpx.AsyncClient(timeout=20.0) as client:
-            response = await client.post(
-                f"{TELEGRAM_API}/bot{TELEGRAM_BOT_TOKEN}/deleteMessage",
-                json={"chat_id": TELEGRAM_CHANNEL_ID, "message_id": message_id},
-            )
-    except httpx.HTTPError as exc:
-        raise HTTPException(status_code=502, detail="Could not reach local Telegram Bot API") from exc
-
-    try:
-        data = response.json()
-    except ValueError:
-        data = {"ok": False, "description": response.text[:1000]}
-
-    if response.status_code != 200 or not data.get("ok"):
+        result = r2_client().complete_multipart_upload(
+            Bucket=R2_BUCKET_NAME,
+            Key=request.key,
+            UploadId=request.upload_id,
+            MultipartUpload={"Parts": parts},
+        )
+        head = r2_client().head_object(Bucket=R2_BUCKET_NAME, Key=request.key)
+    except Exception as exc:
         raise HTTPException(
             status_code=502,
-            detail=data.get("description", "Telegram rejected message deletion"),
-        )
+            detail=f"R2 could not complete the multipart upload: {type(exc).__name__}: {str(exc)[:300]}",
+        ) from exc
 
-    return JSONResponse({"ok": True, "message_id": message_id, "deleted_by": user.get("id")})
+    return JSONResponse({
+        "ok": True,
+        "key": request.key,
+        "etag": result.get("ETag"),
+        "file_size": head.get("ContentLength"),
+        "content_type": head.get("ContentType"),
+        "uploaded_by": user.get("id"),
+    })
 
 
-@app.get("/api/telegram/channels")
-async def telegram_channels(
+@app.post("/api/r2/multipart/abort")
+async def abort_multipart(
+    request: AbortMultipartRequest,
     user: dict = Depends(require_admin_user),
 ) -> JSONResponse:
+    if not request.key.startswith("lectures/"):
+        raise HTTPException(status_code=400, detail="Invalid R2 object key")
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(
-                f"{TELEGRAM_API}/bot{TELEGRAM_BOT_TOKEN}/getUpdates",
-                params={"limit": 100, "allowed_updates": '["channel_post","my_chat_member"]'},
-            )
-    except httpx.HTTPError as exc:
-        raise HTTPException(status_code=502, detail="Could not reach local Telegram Bot API") from exc
-
-    try:
-        data = response.json()
-    except ValueError as exc:
-        raise HTTPException(status_code=502, detail="Invalid Telegram response") from exc
-
-    if response.status_code != 200 or not data.get("ok"):
+        r2_client().abort_multipart_upload(
+            Bucket=R2_BUCKET_NAME,
+            Key=request.key,
+            UploadId=request.upload_id,
+        )
+    except Exception as exc:
         raise HTTPException(
             status_code=502,
-            detail=data.get("description", "Telegram rejected the request"),
-        )
+            detail=f"R2 could not abort the multipart upload: {type(exc).__name__}",
+        ) from exc
 
-    channels = {}
-    for update in data.get("result", []):
-        for key in ("channel_post", "edited_channel_post", "my_chat_member"):
-            obj = update.get(key) or {}
-            chat = obj.get("chat") or {}
-            if chat.get("type") == "channel":
-                channels[str(chat.get("id"))] = {
-                    "id": chat.get("id"),
-                    "title": chat.get("title"),
-                    "username": chat.get("username"),
-                }
-
-    return JSONResponse({"ok": True, "channels": list(channels.values()), "requested_by": user.get("id")})
-
-
-@app.options("/api/upload/video")
-async def upload_video_options() -> JSONResponse:
-    # Explicitly handle the browser preflight at the upload route as well as
-    # through CORSMiddleware. This keeps the endpoint friendly to proxies that
-    # do not forward OPTIONS requests to the normal POST route.
     return JSONResponse({"ok": True})
 
 
+@app.post("/api/r2/signed-url")
+async def signed_url(
+    request: SignedUrlRequest,
+    user: dict = Depends(current_supabase_user),
+) -> JSONResponse:
+    if not request.key.startswith("lectures/"):
+        raise HTTPException(status_code=403, detail="Invalid R2 object key")
+
+    try:
+        url = r2_client().generate_presigned_url(
+            "get_object",
+            Params={"Bucket": R2_BUCKET_NAME, "Key": request.key},
+            ExpiresIn=3600,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"R2 could not create a signed download URL: {type(exc).__name__}",
+        ) from exc
+
+    return JSONResponse({"ok": True, "url": url, "expires_in": 3600})
+
+
+@app.delete("/api/r2/object")
+async def delete_object(
+    key: str,
+    user: dict = Depends(require_admin_user),
+) -> JSONResponse:
+    if not key.startswith("lectures/"):
+        raise HTTPException(status_code=403, detail="Invalid R2 object key")
+    try:
+        r2_client().delete_object(Bucket=R2_BUCKET_NAME, Key=key)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"R2 could not delete the object: {type(exc).__name__}",
+        ) from exc
+    return JSONResponse({"ok": True, "key": key})
+
+
 @app.post("/api/upload/video")
-async def upload_video(
+async def legacy_upload_video(
     file: UploadFile = File(...),
     title: Optional[str] = None,
     lecture_id: Optional[str] = None,
     user: dict = Depends(require_admin_user),
 ) -> JSONResponse:
-    require_upload_env()
-
-    filename = safe_filename(file.filename or "video.mp4")
-    extension = Path(filename).suffix.lower()
-    if extension not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=400, detail=f"Unsupported video type: {extension or 'unknown'}")
-
-    temp_dir = Path(tempfile.mkdtemp(prefix="medidata-video-"))
-    target = temp_dir / filename
-
-    try:
-        total = 0
-        with target.open("wb") as output:
-            while True:
-                chunk = await file.read(8 * 1024 * 1024)
-                if not chunk:
-                    break
-                total += len(chunk)
-                if total > MAX_UPLOAD_BYTES:
-                    raise HTTPException(
-                        status_code=413,
-                        detail="Video exceeds the 2GB Telegram local API limit",
-                    )
-                output.write(chunk)
-
-        print(
-            f"[upload] browser upload complete file={filename} size={total} "
-            f"lecture_id={lecture_id or ''} channel_configured={bool(TELEGRAM_CHANNEL_ID)}",
-            flush=True,
-        )
-
-        caption_parts = [
-            f"MediData video: {title.strip()}" if title and title.strip() else f"MediData video: {filename}",
-        ]
-        if lecture_id and lecture_id.strip():
-            caption_parts.append(f"Lecture ID: {lecture_id.strip()}")
-        caption_parts.append(f"Uploaded by: {user.get('email') or user.get('id')}")
-
-        message = await send_local_document(target, filename, "\n".join(caption_parts))
-        document = message.get("document") or {}
-
-        print(
-            f"[upload] telegram upload complete message_id={message.get('message_id')} "
-            f"file_id_present={bool(document.get('file_id'))}",
-            flush=True,
-        )
-
-        return JSONResponse({
-            "ok": True,
-            "provider": "telegram",
-            "chat_id": TELEGRAM_CHANNEL_ID,
-            "message_id": message.get("message_id"),
-            "file_id": document.get("file_id"),
-            "file_unique_id": document.get("file_unique_id"),
-            "file_name": document.get("file_name") or filename,
-            "file_size": document.get("file_size") or total,
-            "uploaded_by": user.get("id"),
-        })
-    except HTTPException:
-        raise
-    except Exception as exc:
-        print(f"[upload] unexpected error for {filename}: {type(exc).__name__}: {exc}", flush=True)
-        traceback.print_exc()
-        return JSONResponse(
-            status_code=500,
-            content={
-                "ok": False,
-                "error": "UPLOAD_INTERNAL_ERROR",
-                "detail": f"{type(exc).__name__}: {str(exc)[:500]}",
-            },
-        )
-    finally:
-        try:
-            await file.close()
-        except Exception:
-            pass
-        shutil.rmtree(temp_dir, ignore_errors=True)
+    raise HTTPException(
+        status_code=410,
+        detail="The old Telegram upload endpoint was removed. Use the R2 multipart upload flow.",
+    )
