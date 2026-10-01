@@ -31,13 +31,14 @@ app = FastAPI(title="MediData Telegram Video Backend", version="1.1.2")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://admin-dashboard-no15i2cjd-medi-data-team.vercel.app",
-    ],
-    allow_origin_regex=r"https://.*\.vercel\.app$",
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "Origin"],
+    # The admin dashboard sends the Supabase JWT in the Authorization header.
+    # No browser cookies are used, so credentialed CORS is not required.
+    # Using wildcard origins/headers also avoids failures when Vercel creates
+    # a different deployment hostname.
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
     max_age=600,
 )
 
