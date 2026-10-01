@@ -105,7 +105,7 @@ class R2StorageService {
               ),
             );
             etag = response.headers.value('etag');
-            if (etag == null || etag!.isEmpty) throw Exception('R2 did not return an ETag for part $partNumber.');
+            if (etag == null || etag.isEmpty) throw Exception('R2 did not return an ETag for part $partNumber.');
             break;
           } catch (e) {
             lastError = e;
