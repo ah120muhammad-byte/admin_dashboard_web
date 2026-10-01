@@ -143,7 +143,7 @@ class R2StorageService {
     final token = _supabase.auth.currentSession?.accessToken;
     if (token == null || token.isEmpty) return;
     await _dio.delete<void>(
-      _baseUrl + '/api/r2/object',
+      '$_baseUrl/api/r2/object',
       queryParameters: {'key': key},
       options: dio.Options(
         headers: {'Authorization': 'Bearer $token'},
@@ -159,7 +159,7 @@ class R2StorageService {
     return url;
   }
 
-  String buildFileUrl(String key) => 'r2:' + key.trim();
+  String buildFileUrl(String key) => 'r2:${key.trim()}';
 
   String keyFromFileUrl(String value) {
     final trimmed = value.trim();
