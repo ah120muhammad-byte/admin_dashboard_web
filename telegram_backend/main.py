@@ -8,8 +8,8 @@ from typing import Optional
 
 import httpx
 from fastapi import Depends, FastAPI, File, Header, HTTPException, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
 
 TELEGRAM_LOCAL_PORT = int(os.getenv("TELEGRAM_LOCAL_PORT", "8081"))
 TELEGRAM_API = f"http://127.0.0.1:{TELEGRAM_LOCAL_PORT}"
@@ -28,14 +28,21 @@ ALLOWED_EXTENSIONS = {
     ".mp4", ".mov", ".m4v", ".webm", ".avi", ".mkv"
 }
 
-app = FastAPI(title="MediData Telegram Video Backend", version="1.1.0")
+app = FastAPI(title="MediData Telegram Video Backend", version="1.1.1")
 
+# The admin dashboard runs on Vercel and sends an Authorization header.
+# Explicitly allow the browser origins that can call this API so the
+# browser's OPTIONS preflight succeeds before the real upload request.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=[
+        "https://admin-dashboard-no15i2cjd-medi-data-team.vercel.app",
+    ],
+    allow_origin_regex=r"https://.*\\.vercel\\.app$",
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin"],
+    max_age=600,
 )
 
 
@@ -106,6 +113,9 @@ async def current_supabase_user(
     if ALLOWED_ADMIN_USER_IDS and user_id not in ALLOWED_ADMIN_USER_IDS:
         raise HTTPException(status_code=403, detail="User is not allowed to upload videos")
 
+    # Keep the validated token so require_admin_user can use the same
+    # authenticated session when checking the profile role.
+    user["_access_token"] = access_token
     return user
 
 
