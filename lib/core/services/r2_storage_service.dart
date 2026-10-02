@@ -12,7 +12,7 @@ class R2UploadResult {
 }
 
 class R2StorageService {
-  static const String backendUrl = String.fromEnvironment('TELEGRAM_BACKEND_URL', defaultValue: '');
+  static const String backendUrl = String.fromEnvironment('R2_BACKEND_URL', defaultValue: '');
   final SupabaseClient _supabase;
   final dio.Dio _dio;
 
@@ -23,7 +23,7 @@ class R2StorageService {
   String get _baseUrl {
     final value = backendUrl.trim().replaceFirst(RegExp(r'/+$'), '');
     if (value.isEmpty) {
-      throw Exception('R2 backend URL is not configured. Build with --dart-define=TELEGRAM_BACKEND_URL=...');
+      throw Exception('R2 backend URL is not configured. Build with --dart-define=R2_BACKEND_URL=...');
     }
     return value;
   }
