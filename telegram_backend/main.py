@@ -133,7 +133,13 @@ async def current_supabase_user(
         ) from exc
 
     if response.status_code != 200:
-        raise HTTPException(status_code=401, detail="Invalid or expired Supabase session")
+        # Keep the upstream Auth reason visible for diagnostics without ever
+        # returning the user's access token or other credentials.
+        upstream_detail = response.text.strip().replace("\n", " ")[:240]
+        raise HTTPException(
+            status_code=401,
+            detail=f"Supabase Auth rejected the access token ({response.status_code}): {upstream_detail}",
+        )
 
     try:
         user = response.json()
