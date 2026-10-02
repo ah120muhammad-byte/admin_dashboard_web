@@ -323,9 +323,15 @@ class AdminNotificationService {
     );
 
     final data = response.data;
-    if (data is Map<String, dynamic>) return data;
-    if (data is Map) return Map<String, dynamic>.from(data);
-    throw Exception('Unexpected notification response.');
+    if (data is Map) {
+      final result = Map<String, dynamic>.from(data);
+      final error = result['error']?.toString().trim();
+      if (error != null && error.isNotEmpty) {
+        throw Exception(error);
+      }
+      return result;
+    }
+    throw Exception('Unexpected notification response from notification server.');
   }
 
   Future<List<String>> getUserIdsWithRegisteredDevices(List<String> userIds) async {
