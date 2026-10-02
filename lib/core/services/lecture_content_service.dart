@@ -50,10 +50,6 @@ class LectureFileItem {
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final String storageProvider;
-  final String? telegramChatId;
-  final int? telegramMessageId;
-  final String? telegramFileId;
-  final String? telegramFileUniqueId;
   final int? fileSize;
 
   const LectureFileItem({
@@ -67,10 +63,6 @@ class LectureFileItem {
     this.createdAt,
     this.updatedAt,
     this.storageProvider = 'supabase',
-    this.telegramChatId,
-    this.telegramMessageId,
-    this.telegramFileId,
-    this.telegramFileUniqueId,
     this.fileSize,
   });
 
@@ -90,10 +82,6 @@ class LectureFileItem {
           ? DateTime.tryParse(map['updated_at'].toString())
           : null,
       storageProvider: map['storage_provider']?.toString() ?? 'supabase',
-      telegramChatId: map['telegram_chat_id']?.toString(),
-      telegramMessageId: (map['telegram_message_id'] as num?)?.toInt(),
-      telegramFileId: map['telegram_file_id']?.toString(),
-      telegramFileUniqueId: map['telegram_file_unique_id']?.toString(),
       fileSize: (map['file_size'] as num?)?.toInt(),
     );
   }
@@ -146,7 +134,7 @@ class LectureContentService {
     final response = await _supabase
         .from('lecture_files')
         .select(
-          'id, lecture_id, title, file_type, file_url, display_order, is_active, created_at, updated_at, storage_provider, telegram_chat_id, telegram_message_id, telegram_file_id, telegram_file_unique_id, file_size',
+          'id, lecture_id, title, file_type, file_url, display_order, is_active, created_at, updated_at, storage_provider, file_size',
         )
         .order('display_order', ascending: true);
 
@@ -159,7 +147,7 @@ class LectureContentService {
     final response = await _supabase
         .from('lecture_files')
         .select(
-          'id, lecture_id, title, file_type, file_url, display_order, is_active, created_at, updated_at, storage_provider, telegram_chat_id, telegram_message_id, telegram_file_id, telegram_file_unique_id, file_size',
+          'id, lecture_id, title, file_type, file_url, display_order, is_active, created_at, updated_at, storage_provider, file_size',
         )
         .eq('lecture_id', lectureId)
         .order('display_order', ascending: true);
