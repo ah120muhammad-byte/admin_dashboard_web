@@ -61,10 +61,12 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
     switch (type.toLowerCase()) {
       case 'pdf':
         return ['pdf'];
-      case 'audio':
-        return ['mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac'];
       case 'video':
         return ['mp4', 'mov', 'm4v', 'webm', 'avi', 'mkv'];
+      case 'audio':
+        // Audio uses FileType.audio below, so we intentionally do not
+        // maintain a fixed extension whitelist.
+        return <String>[];
       default:
         return <String>[];
     }
@@ -85,8 +87,8 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
 
     try {
       final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: extensions,
+        type: type == 'audio' ? FileType.audio : FileType.custom,
+        allowedExtensions: type == 'audio' ? null : extensions,
         allowMultiple: true,
         withData: type != 'video',
         withReadStream: true,
@@ -211,8 +213,8 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
 
     try {
       final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: extensions,
+        type: file.fileType == 'audio' ? FileType.audio : FileType.custom,
+        allowedExtensions: file.fileType == 'audio' ? null : extensions,
         withData: file.fileType != 'video',
         withReadStream: file.fileType == 'video',
       );
