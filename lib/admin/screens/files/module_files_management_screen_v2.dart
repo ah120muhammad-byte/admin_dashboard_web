@@ -64,9 +64,20 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
       case 'video':
         return ['mp4', 'mov', 'm4v', 'webm', 'avi', 'mkv'];
       case 'audio':
-        // Audio uses FileType.audio below, so we intentionally do not
-        // maintain a fixed extension whitelist.
-        return <String>[];
+        // Do not rely on FileType.audio on Flutter Web. Browser file pickers
+        // can omit valid formats such as OPUS from the system audio filter.
+        // Keep the supported audio extensions explicit so OPUS is selectable.
+        return [
+          'mp3',
+          'wav',
+          'm4a',
+          'aac',
+          'ogg',
+          'oga',
+          'opus',
+          'flac',
+          'webm',
+        ];
       default:
         return <String>[];
     }
@@ -87,8 +98,8 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
 
     try {
       final result = await FilePicker.platform.pickFiles(
-        type: type == 'audio' ? FileType.audio : FileType.custom,
-        allowedExtensions: type == 'audio' ? null : extensions,
+        type: FileType.custom,
+        allowedExtensions: extensions,
         allowMultiple: true,
         withData: type != 'video',
         withReadStream: true,
@@ -213,8 +224,8 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
 
     try {
       final result = await FilePicker.platform.pickFiles(
-        type: file.fileType == 'audio' ? FileType.audio : FileType.custom,
-        allowedExtensions: file.fileType == 'audio' ? null : extensions,
+        type: FileType.custom,
+        allowedExtensions: extensions,
         withData: file.fileType != 'video',
         withReadStream: file.fileType == 'video',
       );
