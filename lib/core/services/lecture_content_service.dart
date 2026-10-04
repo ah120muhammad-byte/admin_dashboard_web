@@ -234,7 +234,7 @@ class LectureContentService {
       };
 
       await Dio().post<void>(
-        '${_supabase.storage.url}/$bucket/${Uri.encodeFull(storagePath)}',
+        '${_supabase.storage.url}/object/$bucket/${Uri.encodeFull(storagePath)}',
         data: uploadBytes,
         options: Options(headers: headers),
         onSendProgress: (sent, total) {
