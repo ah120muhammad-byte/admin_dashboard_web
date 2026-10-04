@@ -322,7 +322,7 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
   String? _fileTypeFromName(String name) {
     final extension = name.contains('.') ? name.split('.').last.toLowerCase() : '';
     if (extension == 'pdf') return 'pdf';
-    if (['mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac'].contains(extension)) {
+    if (['mp3', 'm4a', 'aac', 'wav', 'ogg', 'oga', 'opus', 'flac'].contains(extension)) {
       return 'audio';
     }
     if (['mp4', 'mov', 'm4v', 'webm', 'avi', 'mkv'].contains(extension)) {
@@ -349,12 +349,11 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
     try {
       _message('Select the lecture files to upload...');
       final picked = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: [
-          'pdf',
-          'mp3', 'm4a', 'aac', 'wav', 'ogg', 'flac',
-          'mp4', 'mov', 'm4v', 'webm', 'avi', 'mkv',
-        ],
+        // Use an unfiltered picker for the mixed PDF/audio/video dialog.
+        // This prevents Windows/browser filters from hiding valid formats
+        // such as .opus before Flutter can validate the selected filename.
+        type: FileType.any,
+        allowedExtensions: null,
         allowMultiple: true,
         withData: false,
         withReadStream: true,
@@ -469,8 +468,10 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
     try {
       final extensions = _extensionsForType(file.fileType);
       final picked = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: extensions,
+        // Audio is intentionally unfiltered so formats such as .opus are
+        // selectable on Windows/browser. We validate the extension below.
+        type: file.fileType == 'audio' ? FileType.any : FileType.custom,
+        allowedExtensions: file.fileType == 'audio' ? null : extensions,
         withData: false,
         withReadStream: true,
         readSequential: true,
@@ -479,6 +480,19 @@ class _ModuleManagementScreenState extends State<ModuleManagementScreen> {
       if (!mounted || picked == null || picked.files.isEmpty) return;
 
       final selected = picked.files.single;
+
+      if (file.fileType == 'audio') {
+        final extension = selected.name.contains('.')
+            ? selected.name.split('.').last.toLowerCase()
+            : '';
+        if (!extensions.contains(extension)) {
+          _message(
+            'Unsupported audio format. Supported: MP3, M4A, AAC, WAV, OGG, OGA, OPUS, FLAC.',
+            error: true,
+          );
+          return;
+        }
+      }
 
       final confirmed = await showDialog<bool>(
         context: context,
