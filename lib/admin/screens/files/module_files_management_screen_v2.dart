@@ -97,9 +97,12 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
     });
 
     try {
+      // OPUS is not consistently exposed by browser/Windows file dialogs
+      // through an extension filter. For audio, open the picker without an
+      // OS/browser filter and validate the extension ourselves afterwards.
       final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: extensions,
+        type: type == 'audio' ? FileType.any : FileType.custom,
+        allowedExtensions: type == 'audio' ? null : extensions,
         allowMultiple: true,
         withData: type != 'video',
         withReadStream: true,
@@ -108,6 +111,30 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
       if (!mounted || result == null || result.files.isEmpty) return;
 
       final files = result.files;
+
+      if (type == 'audio') {
+        final supported = files.where((file) {
+          final extension = file.name.contains('.')
+              ? file.name.split('.').last.toLowerCase()
+              : '';
+          return extensions.contains(extension);
+        }).toList();
+
+        if (supported.isEmpty) {
+          throw Exception(
+            'No supported audio file was selected. Supported formats: '
+            'MP3, WAV, M4A, AAC, OGG, OGA, OPUS, FLAC, WEBM.',
+          );
+        }
+
+        if (supported.length != files.length) {
+          throw Exception(
+            'One or more selected files are not supported audio files. '
+            'OPUS (.opus) is supported.',
+          );
+        }
+      }
+
       setState(() {
         _uploadTotal = files.length;
         _uploadCurrentFile = files.first.name;
@@ -224,14 +251,27 @@ class _ModuleFilesManagementScreenState extends State<ModuleFilesManagementScree
 
     try {
       final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: extensions,
+        type: file.fileType == 'audio' ? FileType.any : FileType.custom,
+        allowedExtensions: file.fileType == 'audio' ? null : extensions,
         withData: file.fileType != 'video',
         withReadStream: file.fileType == 'video',
       );
       if (!mounted || result == null || result.files.isEmpty) return;
 
       final picked = result.files.single;
+
+      if (file.fileType == 'audio') {
+        final extension = picked.name.contains('.')
+            ? picked.name.split('.').last.toLowerCase()
+            : '';
+        if (!extensions.contains(extension)) {
+          _message(
+            'Unsupported audio format. OPUS (.opus) is supported.',
+            error: true,
+          );
+          return;
+        }
+      }
 
       final confirmed = await showDialog<bool>(
         context: context,
