@@ -37,21 +37,14 @@ ALLOWED_EXTENSIONS = {".mp4", ".mov", ".m4v", ".webm", ".avi", ".mkv"}
 
 app = FastAPI(title="MediData R2 Storage Backend", version="2.0.0")
 
-CORS_ORIGINS = [
-    origin.strip().rstrip("/")
-    for origin in os.getenv(
-        "CORS_ORIGINS",
-        "https://admin-dashboard-no15i2cjd-medi-data-team.vercel.app"
-    ).split(",")
-    if origin.strip()
-]
+CORS_ORIGINS = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
+    allow_methods=["*"],
+    allow_headers=["*"],
     expose_headers=["ETag", "Content-Length", "Content-Type"],
     max_age=86400,
 )
