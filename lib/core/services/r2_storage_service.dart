@@ -12,7 +12,10 @@ class R2UploadResult {
 }
 
 class R2StorageService {
-  static const String backendUrl = String.fromEnvironment('R2_BACKEND_URL', defaultValue: '');
+  static const String backendUrl = String.fromEnvironment(
+    'R2_BACKEND_URL',
+    defaultValue: 'https://admin-dashboard-web.ahmedmmunir.blitz.cloud',
+  );
   final SupabaseClient _supabase;
   final dio.Dio _dio;
 
