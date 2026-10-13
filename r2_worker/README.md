@@ -65,7 +65,7 @@ Expected: `status: ok`, `r2_configured: true`, `r2_ok: true`, and bucket `medida
 1. Test `/health`.
 2. Test a small admin multipart upload and verify the database row stores `file_url = r2:<key>`.
 3. Test playing and downloading the same video in the student app.
-4. Only after those checks pass, change `R2_BACKEND_URL` for the admin Vercel build and the student app build to the Worker URL. Keep Blitz available until migration verification is complete.
+4. Keep Blitz available until upload and playback are verified against the Worker.
 
 ## Large-file behavior
 
