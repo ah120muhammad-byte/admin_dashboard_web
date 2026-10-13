@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "medidata-r2-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-13",
+  "observability": {
+    "enabled": true
+  },
+  "r2_buckets": [
+    {
+      "binding": "R2_BUCKET",
+      "bucket_name": "medidata-videos"
+    }
+  ],
+  "vars": {
+    "R2_BUCKET_NAME": "medidata-videos",
+    "SUPABASE_URL": "https://eoyehpqknyoksaxlvnwl.supabase.co"
+  }
+}
