@@ -104,7 +104,7 @@ class R2StorageService {
               onSendProgress: (sent, total) {
                 if (total <= 0) return;
                 if (sent > maxPartBytesSent) {
-                  maxPartBytesSent = sent.clamp(0, bytes.length);
+                  maxPartBytesSent = sent.clamp(0, bytes.length).toInt();
                 }
                 // Keep progress monotonic across retries, and reserve the final
                 // 1% for R2's multipart completion request.
