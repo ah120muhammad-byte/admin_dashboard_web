@@ -149,10 +149,51 @@ async function requireAdmin(request: Request, env: Env): Promise<AuthUser> {
   return user;
 }
 
-async function createSignedUrl(env: Env, key: string, method: "GET" | "PUT", query: Record<string, string> = {}): Promise<string> {
+function s3ObjectUrl(env: Env, key: string, query: Record<string, string> = {}): URL {
   const bucket = requireValue(env.R2_BUCKET_NAME, "R2_BUCKET_NAME");
   const url = new URL(getR2Endpoint(env) + "/" + encodeURIComponent(bucket) + "/" + encodeKey(key));
   for (const [name, value] of Object.entries(query)) url.searchParams.set(name, value);
+  return url;
+}
+
+async function s3Request(
+  env: Env,
+  key: string,
+  method: string,
+  query: Record<string, string> = {},
+  body?: string,
+  headers: Record<string, string> = {},
+): Promise<Response> {
+  const url = s3ObjectUrl(env, key, query);
+  return getR2Signer(env).fetch(url.toString(), {
+    method,
+    headers,
+    body,
+  });
+}
+
+function decodeXmlText(value: string): string {
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
+}
+
+function xmlTagValue(xml: string, tag: string): string | null {
+  const match = xml.match(new RegExp("<" + tag + "(?:\\s[^>]*)?>([\\s\\S]*?)</" + tag + ">", "i"));
+  return match ? decodeXmlText(match[1].trim()) : null;
+}
+
+function s3ErrorSummary(xml: string): string {
+  const code = xmlTagValue(xml, "Code");
+  const message = xmlTagValue(xml, "Message");
+  return [code, message].filter(Boolean).join(": ").slice(0, 300) || xml.replace(/\\s+/g, " ").slice(0, 300);
+}
+
+async function createSignedUrl(env: Env, key: string, method: "GET" | "PUT", query: Record<string, string> = {}): Promise<string> {
+  const url = s3ObjectUrl(env, key, query);
   url.searchParams.set("X-Amz-Expires", "3600");
   const signed = await getR2Signer(env).sign(new Request(url, { method }), { aws: { signQuery: true } });
   return signed.url.toString();
@@ -192,12 +233,25 @@ async function route(request: Request, env: Env): Promise<Response> {
     const contentType = contentTypeForFilename(filename, body.content_type);
     const key = buildObjectKey(lectureId, filename);
     try {
-      const upload = await env.R2_BUCKET.createMultipartUpload(key, {
-        httpMetadata: { contentType },
-        customMetadata: { "lecture-id": lectureId.slice(0, 200), "uploaded-by": user.id.slice(0, 200), "original-filename": filename.slice(0, 200) },
+      // Start the multipart session through the S3 API because parts are sent to
+      // S3-compatible presigned URLs and must use the same S3 multipart upload ID.
+      const response = await s3Request(env, key, "POST", { uploads: "" }, undefined, {
+        "Content-Type": contentType,
+        "x-amz-meta-lecture-id": lectureId.slice(0, 200),
+        "x-amz-meta-uploaded-by": user.id.slice(0, 200),
+        "x-amz-meta-original-filename": filename.slice(0, 200),
       });
-      return json({ ok: true, key, upload_id: upload.uploadId, part_size: PART_SIZE, file_name: filename, file_size: fileSize });
-    } catch (error) { console.error("R2 multipart initiate failed", error); throw new ApiError(502, "R2 could not start the multipart upload"); }
+      const responseText = await response.text();
+      if (!response.ok) {
+        throw new Error("CreateMultipartUpload failed (HTTP " + response.status + "): " + s3ErrorSummary(responseText));
+      }
+      const uploadId = xmlTagValue(responseText, "UploadId");
+      if (!uploadId) throw new Error("R2 returned no UploadId: " + responseText.slice(0, 240));
+      return json({ ok: true, key, upload_id: uploadId, part_size: PART_SIZE, file_name: filename, file_size: fileSize });
+    } catch (error) {
+      console.error("R2 S3 multipart initiate failed", error);
+      throw new ApiError(502, "R2 could not start the multipart upload: " + (error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300)));
+    }
   }
 
   if (method === "POST" && path === "/api/r2/multipart/part-url") {
@@ -219,10 +273,37 @@ async function route(request: Request, env: Env): Promise<Response> {
     if (!Array.isArray(body.parts) || body.parts.length === 0) throw new ApiError(400, "Invalid multipart completion request");
     const parts = body.parts.map((part) => ({ partNumber: Number(part.part_number), etag: requireValue(part.etag, "etag") })).sort((a, b) => a.partNumber - b.partNumber);
     for (const part of parts) if (!Number.isInteger(part.partNumber) || part.partNumber < 1 || part.partNumber > 10000) throw new ApiError(400, "Invalid uploaded part number");
+    const seenPartNumbers = new Set<number>();
+    for (const part of parts) {
+      if (!Number.isInteger(part.partNumber) || part.partNumber < 1 || part.partNumber > 10000) {
+        throw new ApiError(400, "Invalid uploaded part number");
+      }
+      if (seenPartNumbers.has(part.partNumber)) throw new ApiError(400, "Duplicate uploaded part number");
+      seenPartNumbers.add(part.partNumber);
+    }
+    const xml = '<?xml version="1.0" encoding="UTF-8"?>' +
+      "<CompleteMultipartUpload>" +
+      parts.map((part) => "<Part><PartNumber>" + part.partNumber +
+        "</PartNumber><ETag>" + part.etag.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") +
+        "</ETag></Part>").join("") +
+      "</CompleteMultipartUpload>";
     try {
-      const object = await env.R2_BUCKET.resumeMultipartUpload(key, uploadId).complete(parts);
+      // Complete through the same S3 API that created the upload ID and received each part.
+      const response = await s3Request(env, key, "POST", { uploadId }, xml, {
+        "Content-Type": "application/xml",
+      });
+      const responseText = await response.text();
+      // S3 can report a multipart completion error inside an HTTP 200 response.
+      if (!response.ok || /<Error(?:\\s|>)/i.test(responseText)) {
+        throw new Error("CompleteMultipartUpload failed (HTTP " + response.status + "): " + s3ErrorSummary(responseText));
+      }
+      const object = await env.R2_BUCKET.head(key);
+      if (!object) throw new Error("Multipart completion returned success, but the object was not found in the bucket.");
       return json({ ok: true, key, etag: object.httpEtag, file_size: object.size, content_type: object.httpMetadata?.contentType || null, uploaded_by: user.id });
-    } catch (error) { console.error("R2 multipart complete failed", error); throw new ApiError(502, "R2 could not complete the multipart upload"); }
+    } catch (error) {
+      console.error("R2 S3 multipart complete failed", error);
+      throw new ApiError(502, "R2 could not complete the multipart upload: " + (error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300)));
+    }
   }
 
   if (method === "POST" && path === "/api/r2/multipart/abort") {
@@ -230,8 +311,17 @@ async function route(request: Request, env: Env): Promise<Response> {
     const body = await readJson<AbortBody>(request);
     const key = validateLectureKey(body.key);
     const uploadId = requireValue(body.upload_id, "upload_id");
-    try { await env.R2_BUCKET.resumeMultipartUpload(key, uploadId).abort(); return json({ ok: true }); }
-    catch (error) { console.error("R2 multipart abort failed", error); throw new ApiError(502, "R2 could not abort the multipart upload"); }
+    try {
+      const response = await s3Request(env, key, "DELETE", { uploadId });
+      const responseText = await response.text();
+      if (!response.ok) {
+        throw new Error("AbortMultipartUpload failed (HTTP " + response.status + "): " + s3ErrorSummary(responseText));
+      }
+      return json({ ok: true });
+    } catch (error) {
+      console.error("R2 S3 multipart abort failed", error);
+      throw new ApiError(502, "R2 could not abort the multipart upload: " + (error instanceof Error ? error.message.slice(0, 300) : String(error).slice(0, 300)));
+    }
   }
 
   if (method === "POST" && path === "/api/r2/signed-url") {
