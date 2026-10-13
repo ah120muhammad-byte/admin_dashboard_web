@@ -6,8 +6,7 @@
     "strict": true,
     "noEmit": true,
     "lib": [
-      "ES2022",
-      "WebWorker"
+      "ESNext"
     ],
     "types": [
       "@cloudflare/workers-types"
