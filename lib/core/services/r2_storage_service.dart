@@ -78,6 +78,7 @@ class R2StorageService {
     final parts = <Map<String, dynamic>>[];
     var partNumber = 0;
     var uploadedBytes = 0;
+    var reportedProgress = 0.0;
 
     try {
       await for (final bytes in _splitIntoParts(stream, partSize)) {
@@ -94,11 +95,28 @@ class R2StorageService {
 
         String? etag;
         Object? lastError;
+        var maxPartBytesSent = 0;
         for (var attempt = 1; attempt <= 3; attempt++) {
           try {
             final response = await _dio.put<void>(
               url,
               data: bytes,
+              onSendProgress: (sent, total) {
+                if (total <= 0) return;
+                if (sent > maxPartBytesSent) {
+                  maxPartBytesSent = sent.clamp(0, bytes.length);
+                }
+                // Keep progress monotonic across retries, and reserve the final
+                // 1% for R2's multipart completion request.
+                final transferred = uploadedBytes + maxPartBytesSent;
+                final nextProgress = ((transferred / size) * 0.99)
+                    .clamp(0.0, 0.99)
+                    .toDouble();
+                if (nextProgress > reportedProgress) {
+                  reportedProgress = nextProgress;
+                  onProgress?.call(reportedProgress);
+                }
+              },
               options: dio.Options(
                 headers: {
                   'Content-Type': 'application/octet-stream',
@@ -119,7 +137,13 @@ class R2StorageService {
         if (etag == null) throw Exception('Failed to upload part $partNumber: $lastError');
         uploadedBytes += bytes.length;
         parts.add({'part_number': partNumber, 'etag': etag});
-        onProgress?.call((uploadedBytes / size).clamp(0.0, 1.0));
+        final confirmedProgress = ((uploadedBytes / size) * 0.99)
+            .clamp(0.0, 0.99)
+            .toDouble();
+        if (confirmedProgress > reportedProgress) {
+          reportedProgress = confirmedProgress;
+          onProgress?.call(reportedProgress);
+        }
       }
 
       if (parts.isEmpty) throw Exception('No video data was uploaded.');
