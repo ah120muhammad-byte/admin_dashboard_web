@@ -189,7 +189,7 @@ function xmlTagValue(xml: string, tag: string): string | null {
 function s3ErrorSummary(xml: string): string {
   const code = xmlTagValue(xml, "Code");
   const message = xmlTagValue(xml, "Message");
-  return [code, message].filter(Boolean).join(": ").slice(0, 300) || xml.replace(/\\s+/g, " ").slice(0, 300);
+  return [code, message].filter(Boolean).join(": ").slice(0, 300) || xml.replace(/\s+/g, " ").slice(0, 300);
 }
 
 async function createSignedUrl(env: Env, key: string, method: "GET" | "PUT", query: Record<string, string> = {}): Promise<string> {
@@ -272,7 +272,6 @@ async function route(request: Request, env: Env): Promise<Response> {
     const uploadId = requireValue(body.upload_id, "upload_id");
     if (!Array.isArray(body.parts) || body.parts.length === 0) throw new ApiError(400, "Invalid multipart completion request");
     const parts = body.parts.map((part) => ({ partNumber: Number(part.part_number), etag: requireValue(part.etag, "etag") })).sort((a, b) => a.partNumber - b.partNumber);
-    for (const part of parts) if (!Number.isInteger(part.partNumber) || part.partNumber < 1 || part.partNumber > 10000) throw new ApiError(400, "Invalid uploaded part number");
     const seenPartNumbers = new Set<number>();
     for (const part of parts) {
       if (!Number.isInteger(part.partNumber) || part.partNumber < 1 || part.partNumber > 10000) {
@@ -294,7 +293,7 @@ async function route(request: Request, env: Env): Promise<Response> {
       });
       const responseText = await response.text();
       // S3 can report a multipart completion error inside an HTTP 200 response.
-      if (!response.ok || /<Error(?:\\s|>)/i.test(responseText)) {
+      if (!response.ok || /<Error(?:\s|>)/i.test(responseText)) {
         throw new Error("CompleteMultipartUpload failed (HTTP " + response.status + "): " + s3ErrorSummary(responseText));
       }
       const object = await env.R2_BUCKET.head(key);
