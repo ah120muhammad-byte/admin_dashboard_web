@@ -14,7 +14,7 @@ class R2UploadResult {
 class R2StorageService {
   static const String backendUrl = String.fromEnvironment(
     'R2_BACKEND_URL',
-    defaultValue: 'https://admin-dashboard-web.ahmedmmunir.blitz.cloud',
+    defaultValue: 'https://medidata-r2-api.medidata-api.workers.dev',
   );
   final SupabaseClient _supabase;
   final dio.Dio _dio;
