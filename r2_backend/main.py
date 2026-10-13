@@ -139,15 +139,19 @@ async def current_supabase_user(
     if not user_id:
         raise HTTPException(status_code=401, detail="Authenticated user ID is missing")
 
-    if ALLOWED_ADMIN_USER_IDS and user_id not in ALLOWED_ADMIN_USER_IDS:
-        raise HTTPException(status_code=403, detail="User is not allowed to manage videos")
-
+    # Do not apply the admin-only allowlist to every authenticated endpoint:
+    # students also need to request signed download URLs for lecture videos.
     user["_access_token"] = access_token
     return user
 
 
 async def require_admin_user(user: dict = Depends(current_supabase_user)) -> dict:
     user_id = str(user.get("id", "")).strip()
+
+    # Optional extra allowlist applies only to admin-only operations.
+    if ALLOWED_ADMIN_USER_IDS and user_id not in ALLOWED_ADMIN_USER_IDS:
+        raise HTTPException(status_code=403, detail="User is not allowed to manage videos")
+
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(
