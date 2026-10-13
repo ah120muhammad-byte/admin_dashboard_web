@@ -168,8 +168,15 @@ async function route(request: Request, env: Env): Promise<Response> {
     let r2Ok = false;
     let r2Error: string | null = null;
     if (configured) {
-      try { await env.R2_BUCKET.list({ limit: 1 }); r2Ok = true; }
-      catch (error) { r2Error = error instanceof Error ? error.name + ": " + error.message.slice(0, 240) : String(error).slice(0, 240); }
+      try {
+        await env.R2_BUCKET.list({ limit: 1 });
+        const bucketUrl = getR2Endpoint(env) + "/" + encodeURIComponent(env.R2_BUCKET_NAME);
+        const credentialCheck = await getR2Signer(env).fetch(bucketUrl, { method: "HEAD" });
+        if (!credentialCheck.ok) throw new Error("R2 S3 credentials rejected (HTTP " + credentialCheck.status + ")");
+        r2Ok = true;
+      } catch (error) {
+        r2Error = error instanceof Error ? error.name + ": " + error.message.slice(0, 240) : String(error).slice(0, 240);
+      }
     } else r2Error = "Missing one or more required environment variables";
     return json({ status: "ok", r2_configured: configured, r2_ok: r2Ok, r2_error: r2Error, bucket: env.R2_BUCKET_NAME || "medidata-videos", service: "MediData R2 Worker" });
   }
